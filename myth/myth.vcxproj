@@ -12,6 +12,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\camera.cpp" />
+    <ClCompile Include="src\device.cpp" />
     <ClCompile Include="src\files.cpp" />
     <ClCompile Include="src\main.cpp" />
     <ClCompile Include="src\shader.cpp" />
@@ -22,6 +23,7 @@
     <ClInclude Include="include\camera.h" />
     <ClInclude Include="include\clearstate.h" />
     <ClInclude Include="include\debug.h" />
+    <ClInclude Include="include\device.h" />
     <ClInclude Include="include\files.h" />
     <ClInclude Include="include\renderstate.h" />
     <ClInclude Include="include\sampler.h" />
@@ -30,6 +32,8 @@
     <ClInclude Include="include\textureunit.h" />
   </ItemGroup>
   <ItemGroup>
+    <None Include="shaders\phong\fs.glsl" />
+    <None Include="shaders\phong\vs.glsl" />
     <None Include="shaders\simplest\fs.glsl" />
     <None Include="shaders\simplest\vs.glsl" />
     <None Include="shaders\textured\fs.glsl" />

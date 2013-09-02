@@ -19,15 +19,12 @@ static const char CommonShaderCode[] =
 	"\n"
 	"layout (std140) uniform GlobalUniforms\n"
 	"{\n"
-	"	vec4 CameraPos;\n"
-	" mat4 WorldMatrix;\n"
-	"	mat4 ViewMatrix;\n"
-	"	mat4 ProjectionMatrix;\n"
-	" mat4 InverseWorldMatrix;\n"
-	" mat4 InverseViewMatrix;\n"
-	" mat4 WorldViewMatrix;\n"
-	"	mat4 ViewProjectionMatrix;\n"
-	"	mat4 WorldViewProjectionMatrix;\n"
+  " vec4 CameraPosition;             // World coordinate of the camera.\n"
+  " mat4 WorldMatrix;                // Model- to view-space transform.\n"
+  " mat4 ViewMatrix;                 // View- to projection-space transform.\n"
+  " mat4 ProjectionMatrix;           // Projection- to screen-space transform.\n"
+  " mat4 NormalMatrix;               // Surface normal transform.\n"
+  " mat4 WorldViewProjectionMatrix;  // The full transformative beans.\n"
 	"};\n"
 	"\n"
 };
@@ -67,6 +64,10 @@ Shader::Shader(const std::string& name)
     QueryShaderAttributes(programHandle);
     QueryShaderUniforms(programHandle, uniforms);
   }
+  else
+  {
+    exit(EXIT_FAILURE);
+  }
 }
 
 Shader::~Shader()
@@ -80,6 +81,8 @@ void Shader::Use()
 {
   glUseProgram(programHandle);
 }
+
+//--------------------------------------------------
 
 void Shader::ApplyUniforms()
 {

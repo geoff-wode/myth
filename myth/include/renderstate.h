@@ -3,6 +3,7 @@
 
 #include <glm/glm.hpp>
 #include <textureunit.h>
+#include <shader.h>
 #include <gl_loader/gl_loader.h>
 #include <boost/shared_ptr.hpp>
 
@@ -11,14 +12,18 @@ struct RenderState
 {
   RenderState()
     : colourMask(true), depthMask(true),
-      depthTestEnabled(true), depthFunc(GL_LESS),
+      enableDepthTest(true), depthFunc(GL_LESS),
       enableCulling(true), cullFace(GL_BACK), frontFace(GL_CCW)
   {
   }
 
+  // Whether to allow changes to colour buffer channels.
   glm::bvec4 colourMask;
+
+  // Whether to allow changes to the depth buffer value.
   bool depthMask;
-  bool depthTestEnabled;
+
+  bool enableDepthTest;
   GLenum depthFunc;
 
   bool enableCulling;

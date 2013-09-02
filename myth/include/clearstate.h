@@ -7,12 +7,16 @@
 struct ClearState
 {
   ClearState()
-    : colour(0,0,0,1), depth(1.0f)
+    : colour(0,0,0,1), colourMask(true),
+      depth(1.0f), depthMask(true)
   {
   }
 
   glm::vec4 colour;
+  glm::bvec4 colourMask;
+
   float depth;
+  bool depthMask;
 };
 
 #endif // __CLEAR_STATE__
