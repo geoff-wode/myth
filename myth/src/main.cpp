@@ -192,13 +192,16 @@ static void MakeCrate()
 
   woodenCrate->shader = boost::make_shared<Shader>("shaders/phong");
   woodenCrate->shader->SetUniform("sampler", 0);
+
   woodenCrate->shader->SetUniform("light.colour", glm::vec3(1.0f));
-  woodenCrate->shader->SetUniform("light.position", camera->Position);
+  woodenCrate->shader->SetUniform("light.position", glm::vec3(-3.0f, 0.0f, 3.0f));
+  woodenCrate->shader->SetUniform("light.attenuation", 0.05f);
+  
   woodenCrate->shader->SetUniform("material.emissive", glm::vec3(0.0f));
-  woodenCrate->shader->SetUniform("material.ambient", glm::vec3(0.2f));
+  woodenCrate->shader->SetUniform("material.ambient", glm::vec3(1.0f));
   woodenCrate->shader->SetUniform("material.diffuse", glm::vec3(1.0f));
-  woodenCrate->shader->SetUniform("material.specular", glm::vec3(0.0f));
-  woodenCrate->shader->SetUniform("material.shininess", 0.0f);
+  woodenCrate->shader->SetUniform("material.specular", glm::vec3(1.0f));
+  woodenCrate->shader->SetUniform("material.shininess", 60.0f);
 
   woodenCrate->sampler = boost::make_shared<Sampler2D>();
 

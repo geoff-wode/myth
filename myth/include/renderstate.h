@@ -33,7 +33,7 @@ struct RenderState
   GLuint vao;
   boost::shared_ptr<Shader> shader;
 
-  static const size_t MaxTextureUnits = 16;
+  static const size_t MaxTextureUnits = 15;
   TextureUnit textureUnits[MaxTextureUnits];
 };
 

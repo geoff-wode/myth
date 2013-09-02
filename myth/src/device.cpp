@@ -287,9 +287,10 @@ static void ApplyTextureUnits(const TextureUnit value[])
 {
   for (size_t i = 0; i < RenderState::MaxTextureUnits; ++i)
   {
+    glActiveTexture(GL_TEXTURE0 + i);
+
     if (currentRenderState.textureUnits[i] != value[i])
     {
-      glActiveTexture(GL_TEXTURE0 + i);
       if (value[i].active)
       {
         if (value[i].texture != currentRenderState.textureUnits[i].texture) { value[i].texture->Activate(); }
