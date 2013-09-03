@@ -25,6 +25,7 @@
     <ClInclude Include="include\debug.h" />
     <ClInclude Include="include\device.h" />
     <ClInclude Include="include\files.h" />
+    <ClInclude Include="include\light.h" />
     <ClInclude Include="include\renderstate.h" />
     <ClInclude Include="include\sampler.h" />
     <ClInclude Include="include\shader.h" />

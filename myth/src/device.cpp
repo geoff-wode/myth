@@ -2,10 +2,13 @@
 #include <debug.h>
 #include <device.h>
 #include <buffers.h>
+#include <light.h>
 #include <boost/shared_ptr.hpp>
 #include <boost/make_shared.hpp>
 
 //--------------------------------------------------------------------
+
+static const size_t MaxLights = 4;
 
 struct GlobalUniforms
 {
@@ -15,6 +18,7 @@ struct GlobalUniforms
   glm::mat4 ProjectionMatrix;           // Projection- to screen-space transform.
   glm::mat4 NormalMatrix;               // Surface normal transform.
   glm::mat4 WorldViewProjectionMatrix;  // The full transformative beans.
+  Light lights[MaxLights];
 };
 
 //--------------------------------------------------------------------
@@ -39,6 +43,8 @@ static RenderState currentRenderState;
 static GlobalUniforms globalUniforms;
 static boost::shared_ptr<UniformBuffer> uniformBuffer;
 static bool globalUniformsDirty = false;
+static bool operator==(const Light& a, const Light& b);
+static bool operator!=(const Light& a, const Light& b);
 
 //--------------------------------------------------------------------
 
@@ -166,6 +172,28 @@ void Device::Draw(GLenum primitiveType, GLint startVertex, GLint vertexCount, co
 void Device::SwapBuffers()
 {
   SDL_GL_SwapWindow(mainWindow);
+}
+
+//--------------------------------------------------------------------
+void Device::EnableLight(size_t index, bool turnOn)
+{
+  if (index < MaxLights)
+  {
+    if (globalUniforms.lights[index].enabled != turnOn)
+    {
+      globalUniforms.lights[index].enabled = turnOn;
+      globalUniformsDirty = true;
+    }
+  }
+}
+
+void Device::SetLight(size_t index, const Light& value)
+{
+  if (index < MaxLights)
+  {
+    globalUniforms.lights[index] = value;
+    globalUniformsDirty = true;
+  }
 }
 
 //--------------------------------------------------------------------
@@ -382,4 +410,16 @@ static void ApplyDepthFunc(bool enabled, GLenum func)
       currentRenderState.depthFunc = func;
     }
   }
+}
+
+//-----------------------------------------------------
+static bool operator==(const Light& a, const Light& b)
+{
+  return  (a.position == b.position) &&
+          (a.colourAttenuation == b.colourAttenuation);
+}
+static bool operator!=(const Light& a, const Light& b)
+{
+  return  (a.position != b.position) &&
+          (a.colourAttenuation != b.colourAttenuation);
 }

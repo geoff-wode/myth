@@ -17,6 +17,13 @@ static const char CommonShaderCode[] =
 	"#define TWO_PI (PI * 2)\n"
 	"#define PI_OVER_2 (PI * 0.5f)\n"
 	"\n"
+  "const int MaxLights = 4;\n"
+  "struct Light\n"
+  "{\n"
+  " vec4 position;    // if w == 0, light is directional, else positional\n"
+  " vec4 colour;      // rgb are the light intensity in those channels, a is the attenuation factor\n"
+  " bool enabled;\n"
+  "};\n"
 	"layout (std140) uniform GlobalUniforms\n"
 	"{\n"
   " vec4 CameraPosition;             // World coordinate of the camera.\n"
@@ -25,6 +32,7 @@ static const char CommonShaderCode[] =
   " mat4 ProjectionMatrix;           // Projection- to screen-space transform.\n"
   " mat4 NormalMatrix;               // Surface normal transform.\n"
   " mat4 WorldViewProjectionMatrix;  // The full transformative beans.\n"
+  " Light Lights[MaxLights];\n"
 	"};\n"
 	"\n"
 };
@@ -269,7 +277,7 @@ static void QueryShaderUniforms(GLuint program, ShaderUniformMap& uniforms)
     {
       char blockName[128] = { 0 };
       glGetActiveUniformBlockName(program, blockIndices[i], sizeof(blockName)-1, NULL, blockName);
-      LOG("    %s::%s\n", blockName, uniformName);
+      LOG("    block %s - %s\n", blockName, uniformName);
     }
 	}
 

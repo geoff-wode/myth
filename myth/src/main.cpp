@@ -25,14 +25,7 @@
 
 //-----------------------------------------------------
 
-struct Vertex
-{
-  glm::vec3 position;
-  glm::vec3 normal;
-  glm::vec2 textureCoord;
-};
-
-struct ModelAsset
+struct Asset
 {
   GLuint vao;
   GLenum drawType;
@@ -44,28 +37,30 @@ struct ModelAsset
   boost::shared_ptr<VertexBuffer> vertexBuffer;
 };
 
-struct ModelInstance
+struct AssetInstance
 {
   glm::mat4 transform;
-  boost::shared_ptr<ModelAsset> asset;
+  boost::shared_ptr<Asset> asset;
 };
 
 //-----------------------------------------------------
 
 FILE* debug::logFile;
 
-static boost::shared_ptr<ModelAsset> woodenCrate;
-static std::list<boost::shared_ptr<ModelInstance>> instances;
-
 static boost::shared_ptr<Camera> camera;
 
-static float rotation = 0.0f;
+static float rotationOfDot = 0.0f;
+static float rotationOfLight = 0.0f;
+static Light light(true, glm::vec4(-3.0f, 0.0f, 3.0f, 1.0f));
+
+static boost::shared_ptr<Asset> woodenCrate;
+static std::list<AssetInstance> instances;
 
 //-----------------------------------------------------
 
 static void Init(const std::string& title, int width, int height, bool fullScreen);
-static void MakeCrate();
-static void CreateInstances();
+static boost::shared_ptr<Asset> MakeCrate();
+static void CreateInstances(std::list<AssetInstance>& instances);
 static void Update(unsigned int elapsedMS);
 static void Render();
 
@@ -86,8 +81,10 @@ int main(int argc, char* argv[])
   camera->Yaw = 40.0f;
   camera->Pitch = 5.0f;
 
-  MakeCrate();
-  CreateInstances();
+  woodenCrate = MakeCrate();
+  CreateInstances(instances);
+
+  Device::SetLight(0, light);
 
   bool quit = false;
   unsigned int prevTime = 0;
@@ -124,9 +121,14 @@ int main(int argc, char* argv[])
 }
 
 //-----------------------------------------------------
-static void MakeCrate()
+static boost::shared_ptr<Asset> MakeCrate()
 {
-  static Vertex vertices[] =
+  static struct Vertex
+  {
+    glm::vec3 position;
+    glm::vec3 normal;
+    glm::vec2 textureCoord;
+  } vertices[] =
   {
     // bottom
     { glm::vec3(-1.0f,-1.0f,-1.0f), glm::vec3(0.0f, -1.0f, 0.0f), glm::vec2(0.0f, 0.0f) },
@@ -177,62 +179,62 @@ static void MakeCrate()
     { glm::vec3( 1.0f, 1.0f, 1.0f), glm::vec3(1.0f, 0.0f, 0.0f), glm::vec2(0.0f, 1.0f) }
   };
 
-  woodenCrate = boost::make_shared<ModelAsset>();
+  boost::shared_ptr<Asset> crate = boost::make_shared<Asset>();
 
-  woodenCrate->drawType = GL_TRIANGLES;
-  woodenCrate->drawFirstVertex = 0;
-  woodenCrate->drawVertexCount = sizeof(vertices) / sizeof(vertices[0]);
+  crate->drawType = GL_TRIANGLES;
+  crate->drawFirstVertex = 0;
+  crate->drawVertexCount = sizeof(vertices) / sizeof(vertices[0]);
 
-  glGenVertexArrays(1, &woodenCrate->vao);
-  glBindVertexArray(woodenCrate->vao);
+  glGenVertexArrays(1, &crate->vao);
+  glBindVertexArray(crate->vao);
 
-  woodenCrate->vertexBuffer = boost::make_shared<VertexBuffer>(sizeof(vertices), GL_STATIC_DRAW);
-  woodenCrate->vertexBuffer->Enable();
-  woodenCrate->vertexBuffer->SetData(vertices, sizeof(vertices), 0);
+  crate->vertexBuffer = boost::make_shared<VertexBuffer>(sizeof(vertices), GL_STATIC_DRAW);
+  crate->vertexBuffer->Enable();
+  crate->vertexBuffer->SetData(vertices, sizeof(vertices), 0);
 
-  woodenCrate->shader = boost::make_shared<Shader>("shaders/phong");
-  woodenCrate->shader->SetUniform("sampler", 0);
-
-  woodenCrate->shader->SetUniform("light.colour", glm::vec3(1.0f));
-  woodenCrate->shader->SetUniform("light.position", glm::vec3(-3.0f, 0.0f, 3.0f));
-  woodenCrate->shader->SetUniform("light.attenuation", 0.05f);
+  crate->shader = boost::make_shared<Shader>("shaders/phong");
+  crate->shader->SetUniform("sampler", 0);
   
-  woodenCrate->shader->SetUniform("material.emissive", glm::vec3(0.0f));
-  woodenCrate->shader->SetUniform("material.ambient", glm::vec3(1.0f));
-  woodenCrate->shader->SetUniform("material.diffuse", glm::vec3(1.0f));
-  woodenCrate->shader->SetUniform("material.specular", glm::vec3(1.0f));
-  woodenCrate->shader->SetUniform("material.shininess", 60.0f);
+  crate->shader->SetUniform("material.emissive", glm::vec3(0.0f));
+  crate->shader->SetUniform("material.ambient", glm::vec3(1.0f));
+  crate->shader->SetUniform("material.diffuse", glm::vec3(1.0f));
+  crate->shader->SetUniform("material.specular", glm::vec3(1.0f));
+  crate->shader->SetUniform("material.shininess", 60.0f);
 
-  woodenCrate->sampler = boost::make_shared<Sampler2D>();
+  crate->sampler = boost::make_shared<Sampler2D>();
 
-  woodenCrate->texture = boost::make_shared<Texture2D>("images/wooden-crate.jpg");
-  woodenCrate->texture->Load();
+  crate->texture = boost::make_shared<Texture2D>("images/wooden-crate.jpg");
+  crate->texture->Load();
 
-  glEnableVertexAttribArray(woodenCrate->shader->GetAttributeIndex("Position"));
-  glVertexAttribPointer(
-    woodenCrate->shader->GetAttributeIndex("Position"), 3, GL_FLOAT,
-    GL_FALSE,
-    sizeof(Vertex),
-    (const void*)offsetof(Vertex, position));
+  struct VertexAttribute
+  {
+    GLint index;
+    GLint componentCount;
+    GLenum compoentType;
+    size_t offset;
+  } attributes[] =
+  {
+    { crate->shader->GetAttributeIndex("Position"), 3, GL_FLOAT, offsetof(Vertex, position) },
+    { crate->shader->GetAttributeIndex("Normal"), 3, GL_FLOAT, offsetof(Vertex, normal) },
+    { crate->shader->GetAttributeIndex("TextureCoord"), 3, GL_FLOAT, offsetof(Vertex, textureCoord) }
+  };
+  const size_t attributeCount = sizeof(attributes) / sizeof(attributes[0]);
 
-  glEnableVertexAttribArray(woodenCrate->shader->GetAttributeIndex("Normal"));
-  glVertexAttribPointer(
-    woodenCrate->shader->GetAttributeIndex("Normal"),
-    3, GL_FLOAT,
-    GL_FALSE,
-    sizeof(Vertex),
-    (const void*)offsetof(Vertex, normal));
-
-  glEnableVertexAttribArray(woodenCrate->shader->GetAttributeIndex("TextureCoord"));
-  glVertexAttribPointer(
-    woodenCrate->shader->GetAttributeIndex("TextureCoord"),
-    2, GL_FLOAT,
-    GL_FALSE,
-    sizeof(Vertex),
-    (const void*)offsetof(Vertex, textureCoord));
+  for (size_t i = 0; i < attributeCount; ++i)
+  {
+    glEnableVertexAttribArray(attributes[i].index);
+    glVertexAttribPointer(
+      attributes[i].index,
+      attributes[i].componentCount, attributes[i].compoentType,
+      GL_FALSE,
+      sizeof(Vertex),
+      (const void*)attributes[i].offset);
+  }
 
   VertexBuffer::Disable();
   glBindVertexArray(0);
+
+  return crate;
 }
 
 //-----------------------------------------------------
@@ -251,10 +253,8 @@ static void Update(unsigned int elapsedMS)
     if (pressedKeys[SDL_SCANCODE_X]) { camera->Position += (glm::vec3(0,1,0) * unitsPerSecond * elapsedSeconds); }
     if (pressedKeys[SDL_SCANCODE_Z]) { camera->Position += (glm::vec3(0,-1,0) * unitsPerSecond * elapsedSeconds); }
 
-    if (pressedKeys[SDL_SCANCODE_L])
-    {
-      woodenCrate->shader->SetUniform("light.position", camera->Position);
-    }
+    if (pressedKeys[SDL_SCANCODE_I]) { Device::EnableLight(0, true); }
+    if (pressedKeys[SDL_SCANCODE_O]) { Device::EnableLight(0, false); }
   }
 
   // mouse input...
@@ -277,9 +277,29 @@ static void Update(unsigned int elapsedMS)
   // update the object(s)...
   {
     const float rotationsPerSecond = 90.0f;
-    rotation += rotationsPerSecond * elapsedSeconds;
-    if (rotation > 360.0f) { rotation -= 360.0f; }
-    instances.front()->transform = glm::rotate(glm::mat4(1), rotation, glm::vec3(0,1,0));
+    rotationOfDot += rotationsPerSecond * elapsedSeconds;
+    if (rotationOfDot > 360.0f) { rotationOfDot -= 360.0f; }
+    instances.front().transform = glm::rotate(glm::mat4(1), rotationOfDot, glm::vec3(0,1,0));
+  }
+}
+
+//-----------------------------------------------------
+static void RenderHi(RenderState& renderState)
+{
+  BOOST_FOREACH(AssetInstance instance, instances)
+  {
+    const boost::shared_ptr<Asset> asset = instance.asset;
+
+    renderState.vao = asset->vao;
+    renderState.shader = asset->shader;
+
+    renderState.textureUnits[0].active = true;
+    renderState.textureUnits[0].sampler = asset->sampler;
+    renderState.textureUnits[0].texture = asset->texture;
+
+    Device::SetWorldMatrix(instance.transform);
+
+    Device::Draw(asset->drawType, asset->drawFirstVertex, asset->drawVertexCount, renderState);
   }
 }
 
@@ -291,57 +311,38 @@ static void Render()
 
   Device::Clear(clearState, GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-  BOOST_FOREACH(boost::shared_ptr<ModelInstance> instance, instances)
-  {
-    const boost::shared_ptr<ModelAsset> asset = instance->asset;
-
-    renderState.vao = asset->vao;
-    renderState.shader = asset->shader;
-
-    renderState.textureUnits[0].active = true;
-    renderState.textureUnits[0].sampler = asset->sampler;
-    renderState.textureUnits[0].texture = asset->texture;
-
-    Device::SetWorldMatrix(instance->transform);
-
-    Device::Draw(asset->drawType, asset->drawFirstVertex, asset->drawVertexCount, renderState);
-  }
+  RenderHi(renderState);
 
   Device::SwapBuffers();
 }
 
 //-----------------------------------------------------
-static void CreateInstances()
+static void CreateInstances(std::list<AssetInstance>& instances)
 {
-  boost::shared_ptr<ModelInstance> instance;
+  AssetInstance instance;
 
   /* dot over the 'i'*/
-  instance = boost::make_shared<ModelInstance>();
-  instance->asset = woodenCrate;
-  instance->transform = glm::mat4();
+  instance.asset = woodenCrate;
+  instance.transform = glm::mat4();
   instances.push_back(instance);
 
   /* i */
-  instance = boost::make_shared<ModelInstance>();
-  instance->asset = woodenCrate;
-  instance->transform = glm::translate(0.0f, -4.0f, 0.0f) * glm::scale(1.0f, 2.0f, 1.0f);
+  instance.asset = woodenCrate;
+  instance.transform = glm::translate(0.0f, -4.0f, 0.0f) * glm::scale(1.0f, 2.0f, 1.0f);
   instances.push_back(instance);
 
   /* left arm of H */
-  instance = boost::make_shared<ModelInstance>();
-  instance->asset = woodenCrate;
-  instance->transform = glm::translate(-8.0f, 0.0f, 0.0f) * glm::scale(1.0f, 6.0f, 1.0f);
+  instance.asset = woodenCrate;
+  instance.transform = glm::translate(-8.0f, 0.0f, 0.0f) * glm::scale(1.0f, 6.0f, 1.0f);
   instances.push_back(instance);
 
   /* right arm of H */
-  instance = boost::make_shared<ModelInstance>();
-  instance->asset = woodenCrate;
-  instance->transform = glm::translate(-4.0f, 0.0f, 0.0f) * glm::scale(1.0f, 6.0f, 1.0f);
+  instance.asset = woodenCrate;
+  instance.transform = glm::translate(-4.0f, 0.0f, 0.0f) * glm::scale(1.0f, 6.0f, 1.0f);
   instances.push_back(instance);
 
   /* middle bar of H */
-  instance = boost::make_shared<ModelInstance>();
-  instance->asset = woodenCrate;
-  instance->transform = glm::translate(-6.0f, 0.0f, 0.0f) * glm::scale(2.0f, 1.0f, 0.8f);
+  instance.asset = woodenCrate;
+  instance.transform = glm::translate(-6.0f, 0.0f, 0.0f) * glm::scale(2.0f, 1.0f, 0.8f);
   instances.push_back(instance);
 }
