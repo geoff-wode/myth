@@ -9,6 +9,9 @@
 
 namespace Device
 {
+  const ClearState& GetClearState();
+  const RenderState& GetRenderState();
+
   void SetCameraPos(const glm::vec3& value);
   void SetWorldMatrix(const glm::mat4& value);
   void SetViewMatrix(const glm::mat4& value);

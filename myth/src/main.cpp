@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <string>
 #include <list>
+#include <stack>
 #include <glm/glm.hpp>
 #include <glm/ext.hpp>
 #include <glm/gtc/matrix_transform.hpp>
@@ -22,26 +23,9 @@
 #include <renderstate.h>
 #include <clearstate.h>
 #include <device.h>
-
-//-----------------------------------------------------
-
-struct Asset
-{
-  GLuint vao;
-  GLenum drawType;
-  GLint drawFirstVertex;
-  GLint drawVertexCount;
-  boost::shared_ptr<Shader> shader;
-  boost::shared_ptr<Sampler2D> sampler;
-  boost::shared_ptr<Texture2D> texture;
-  boost::shared_ptr<VertexBuffer> vertexBuffer;
-};
-
-struct AssetInstance
-{
-  glm::mat4 transform;
-  boost::shared_ptr<Asset> asset;
-};
+#include <scenegraph/scene.h>
+#include <scenegraph/transformnode.h>
+#include <scenegraph/assetnode.h>
 
 //-----------------------------------------------------
 
@@ -53,16 +37,14 @@ static float rotationOfDot = 0.0f;
 static float rotationOfLight = 0.0f;
 static Light light(true, glm::vec4(-3.0f, 0.0f, 3.0f, 1.0f));
 
-static boost::shared_ptr<Asset> woodenCrate;
-static std::list<AssetInstance> instances;
+static boost::shared_ptr<Scene> scene;
 
 //-----------------------------------------------------
 
 static void Init(const std::string& title, int width, int height, bool fullScreen);
-static boost::shared_ptr<Asset> MakeCrate();
-static void CreateInstances(std::list<AssetInstance>& instances);
+static boost::shared_ptr<Asset> MakeCrateAsset();
 static void Update(unsigned int elapsedMS);
-static void Render();
+static boost::shared_ptr<Scene> CreateScene();
 
 //-----------------------------------------------------
 
@@ -81,10 +63,11 @@ int main(int argc, char* argv[])
   camera->Yaw = 40.0f;
   camera->Pitch = 5.0f;
 
-  woodenCrate = MakeCrate();
-  CreateInstances(instances);
+  scene = CreateScene();
+  scene->Load();
 
   Device::SetLight(0, light);
+  const ClearState clearState;
 
   bool quit = false;
   unsigned int prevTime = 0;
@@ -114,14 +97,19 @@ int main(int argc, char* argv[])
     prevTime = now;
 
     Update(elapsedMS);
-    Render();
+
+    Device::Clear(clearState, GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+    scene->Render();
+
+    Device::SwapBuffers();
   }
 
   return 0;
 }
 
 //-----------------------------------------------------
-static boost::shared_ptr<Asset> MakeCrate()
+static boost::shared_ptr<Asset> MakeCrateAsset()
 {
   static struct Vertex
   {
@@ -275,74 +263,49 @@ static void Update(unsigned int elapsedMS)
   }
 
   // update the object(s)...
+  scene->Update((float)elapsedMS);
   {
-    const float rotationsPerSecond = 90.0f;
-    rotationOfDot += rotationsPerSecond * elapsedSeconds;
-    if (rotationOfDot > 360.0f) { rotationOfDot -= 360.0f; }
-    instances.front().transform = glm::rotate(glm::mat4(1), rotationOfDot, glm::vec3(0,1,0));
+    //const float rotationsPerSecond = 90.0f;
+    //rotationOfDot += rotationsPerSecond * elapsedSeconds;
+    //if (rotationOfDot > 360.0f) { rotationOfDot -= 360.0f; }
+    //instances.front().transform = glm::rotate(glm::mat4(1), rotationOfDot, glm::vec3(0,1,0));
   }
 }
 
 //-----------------------------------------------------
-static void RenderHi(RenderState& renderState)
+static boost::shared_ptr<Scene> CreateScene()
 {
-  BOOST_FOREACH(AssetInstance instance, instances)
+  boost::shared_ptr<AssetNode> crate(new AssetNode(MakeCrateAsset()));
+  boost::shared_ptr<TransformNode> root(new TransformNode());
+
+  // Build up the letter 'i' from 2 parts - the dot and the main body...
   {
-    const boost::shared_ptr<Asset> asset = instance.asset;
+    boost::shared_ptr<TransformNode> dot(new TransformNode());
+    dot->children.push_back(crate);
+    root->children.push_back(dot);
 
-    renderState.vao = asset->vao;
-    renderState.shader = asset->shader;
-
-    renderState.textureUnits[0].active = true;
-    renderState.textureUnits[0].sampler = asset->sampler;
-    renderState.textureUnits[0].texture = asset->texture;
-
-    Device::SetWorldMatrix(instance.transform);
-
-    Device::Draw(asset->drawType, asset->drawFirstVertex, asset->drawVertexCount, renderState);
+    boost::shared_ptr<TransformNode> i(new TransformNode(glm::translate(0.0f, -4.0f, 0.0f) * glm::scale(1.0f, 2.0f, 1.0f)));
+    i->children.push_back(crate);
+    root->children.push_back(i);
   }
-}
 
-//-----------------------------------------------------
-static void Render()
-{
-  static const ClearState clearState;
-  RenderState renderState;
+  // Build up the letter 'H' from 3 parts (left, right, bar)...
+  {
+    boost::shared_ptr<TransformNode> left(new TransformNode(glm::translate(-8.0f, 0.0f, 0.0f) * glm::scale(1.0f, 6.0f, 1.0f)));
+    left->children.push_back(crate);
+    root->children.push_back(left);
 
-  Device::Clear(clearState, GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    boost::shared_ptr<TransformNode> right(new TransformNode(glm::translate(-4.0f, 0.0f, 0.0f) * glm::scale(1.0f, 6.0f, 1.0f)));
+    right->children.push_back(crate);
+    root->children.push_back(right);
 
-  RenderHi(renderState);
+    boost::shared_ptr<TransformNode> bar(new TransformNode(glm::translate(-6.0f, 0.0f, 0.0f) * glm::scale(2.0f, 1.0f, 0.8f)));
+    bar->children.push_back(crate);
+    root->children.push_back(bar);
+  }
 
-  Device::SwapBuffers();
-}
+  boost::shared_ptr<Scene> scene(new Scene());
+  scene->root = root;
 
-//-----------------------------------------------------
-static void CreateInstances(std::list<AssetInstance>& instances)
-{
-  AssetInstance instance;
-
-  /* dot over the 'i'*/
-  instance.asset = woodenCrate;
-  instance.transform = glm::mat4();
-  instances.push_back(instance);
-
-  /* i */
-  instance.asset = woodenCrate;
-  instance.transform = glm::translate(0.0f, -4.0f, 0.0f) * glm::scale(1.0f, 2.0f, 1.0f);
-  instances.push_back(instance);
-
-  /* left arm of H */
-  instance.asset = woodenCrate;
-  instance.transform = glm::translate(-8.0f, 0.0f, 0.0f) * glm::scale(1.0f, 6.0f, 1.0f);
-  instances.push_back(instance);
-
-  /* right arm of H */
-  instance.asset = woodenCrate;
-  instance.transform = glm::translate(-4.0f, 0.0f, 0.0f) * glm::scale(1.0f, 6.0f, 1.0f);
-  instances.push_back(instance);
-
-  /* middle bar of H */
-  instance.asset = woodenCrate;
-  instance.transform = glm::translate(-6.0f, 0.0f, 0.0f) * glm::scale(2.0f, 1.0f, 0.8f);
-  instances.push_back(instance);
+  return scene;
 }

@@ -197,6 +197,17 @@ void Device::SetLight(size_t index, const Light& value)
 }
 
 //--------------------------------------------------------------------
+const ClearState& Device::GetClearState()
+{
+  return currentClearState;
+}
+
+const RenderState& Device::GetRenderState()
+{
+  return currentRenderState;
+}
+
+//--------------------------------------------------------------------
 
 void Device::SetCameraPos(const glm::vec3& value)
 {
