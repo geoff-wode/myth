@@ -1,0 +1,13 @@
+*.suo
+*.pdb
+*.idb
+*.obj
+*.filters
+*.user
+*.pch
+bin/
+lib/
+intermediate/
+Debug/
+*/Debug/
+stderr.txt
