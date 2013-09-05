@@ -188,6 +188,8 @@ static boost::shared_ptr<Asset> CreateFloorAsset()
   asset->shader = boost::make_shared<Shader>("shaders/directionallight");
   asset->shader->SetUniform("samplerRepeat", glm::vec2(0.025f));
   asset->shader->SetUniform("sampler", 0);
+  asset->shader->SetUniform("specularColour", glm::vec3(0.5f));
+  asset->shader->SetUniform("shininess", 5.0f);
 
   glGenVertexArrays(1, &asset->vao);
   glBindVertexArray(asset->vao);
