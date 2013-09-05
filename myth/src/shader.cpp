@@ -17,13 +17,6 @@ static const char CommonShaderCode[] =
 	"#define TWO_PI (PI * 2)\n"
 	"#define PI_OVER_2 (PI * 0.5f)\n"
 	"\n"
-  "const int MaxLights = 4;\n"
-  "struct Light\n"
-  "{\n"
-  " vec4 position;    // if w == 0, light is directional, else positional\n"
-  " vec4 colour;      // rgb are the light intensity in those channels, a is the attenuation factor\n"
-  " bool enabled;\n"
-  "};\n"
 	"layout (std140) uniform GlobalUniforms\n"
 	"{\n"
   " vec4 CameraPosition;             // World coordinate of the camera.\n"
@@ -32,7 +25,6 @@ static const char CommonShaderCode[] =
   " mat4 ProjectionMatrix;           // Projection- to screen-space transform.\n"
   " mat4 NormalMatrix;               // Surface normal transform.\n"
   " mat4 WorldViewProjectionMatrix;  // The full transformative beans.\n"
-  " Light Lights[MaxLights];\n"
 	"};\n"
 	"\n"
 };
@@ -54,8 +46,9 @@ typedef std::map<std::string, ShaderUniform> ShaderUniformMap;
 static std::vector<GLuint> Compile(const std::vector<std::string>& shaderNames);
 static GLuint CompileShader(const char* const code, int codeLength, GLenum type);
 static bool LinkProgram(const std::vector<GLuint> shaders, GLuint programHandle);
-static void QueryShaderAttributes(GLuint program);
-static void QueryShaderUniforms(GLuint program, ShaderUniformMap& uniforms);
+static void QueryShaderAttributes(const GLuint program);
+static void QueryShaderUniforms(const GLuint program, ShaderUniformMap& uniforms);
+static void QueryUniformBlockMembers(const GLuint program, const GLuint blockIndex);
 
 //--------------------------------------------------
 
@@ -151,23 +144,19 @@ void Shader::SetUniform(const std::string& name, const glm::mat4& value) { SetUn
 
 static std::vector<GLuint> Compile(const std::vector<std::string>& shaderNames)
 {
+  std::vector<char> fileContent;
   std::vector<GLuint> shaders(shaderNames.size());
-
-  std::vector<char> srcCode;
   for (size_t i = 0; i < shaderNames.size(); ++i)
   {
-    LoadFile(shaderNames[i], srcCode);
-    if (std::string::npos != shaderNames[i].find("vs.glsl"))
+    LoadFile(shaderNames[i], fileContent);
+    GLenum type = 0;
+    if (std::string::npos != shaderNames[i].find("vs.glsl")) { type = GL_VERTEX_SHADER; }
+    else if (std::string::npos != shaderNames[i].find("fs.glsl")) { type = GL_FRAGMENT_SHADER; }
+    else if (std::string::npos != shaderNames[i].find("gs.glsl")) { type = GL_GEOMETRY_SHADER; }
+
+    if (type)
     {
-      shaders[i] = CompileShader(srcCode.data(), srcCode.size(), GL_VERTEX_SHADER);
-    }
-    else if (std::string::npos != shaderNames[i].find("fs.glsl"))
-    {
-      shaders[i] = CompileShader(srcCode.data(), srcCode.size(), GL_FRAGMENT_SHADER);
-    }
-    else if (std::string::npos != shaderNames[i].find("gs.glsl"))
-    {
-      shaders[i] = CompileShader(srcCode.data(), srcCode.size(), GL_GEOMETRY_SHADER);
+      shaders[i] = CompileShader(fileContent.data(), fileContent.size(), type);
     }
   }
   return shaders;
@@ -226,7 +215,7 @@ static bool LinkProgram(const std::vector<GLuint> shaders, GLuint programHandle)
 }
 
 //--------------------------------------------------
-static void QueryShaderAttributes(GLuint program)
+static void QueryShaderAttributes(const GLuint program)
 {
 	GLint numAttributes;
 	glGetProgramiv(program, GL_ACTIVE_ATTRIBUTES, &numAttributes);
@@ -243,7 +232,7 @@ static void QueryShaderAttributes(GLuint program)
 }
 
 //--------------------------------------------------
-static void QueryShaderUniforms(GLuint program, ShaderUniformMap& uniforms)
+static void QueryShaderUniforms(const GLuint program, ShaderUniformMap& uniforms)
 {
 	GLint numUniforms;
 	glGetProgramiv(program, GL_ACTIVE_UNIFORMS, &numUniforms);
@@ -285,5 +274,30 @@ static void QueryShaderUniforms(GLuint program, ShaderUniformMap& uniforms)
 	if (GL_INVALID_INDEX != uniformBlockIndex)
   {
 		glUniformBlockBinding(program, uniformBlockIndex, 0);
+    QueryUniformBlockMembers(program, uniformBlockIndex);
   }
+}
+
+//--------------------------------------------------
+static void QueryUniformBlockMembers(const GLuint program, const GLuint blockIndex)
+{
+	GLint numBlockUniforms;
+	glGetActiveUniformBlockiv(program, blockIndex, GL_UNIFORM_BLOCK_ACTIVE_UNIFORMS, &numBlockUniforms);
+
+	LOG("  block 'CommonShaderVarsBlock' @ idx %d\n", blockIndex);
+
+	std::vector<GLuint> blockVarIndices(numBlockUniforms);
+	glGetActiveUniformBlockiv(program, blockIndex, GL_UNIFORM_BLOCK_ACTIVE_UNIFORM_INDICES, (GLint*)blockVarIndices.data());
+
+	std::vector<GLint> types(numBlockUniforms);
+	std::vector<GLint> offsets(numBlockUniforms);
+	glGetActiveUniformsiv(program, numBlockUniforms, blockVarIndices.data(), GL_UNIFORM_TYPE, types.data());
+	glGetActiveUniformsiv(program, numBlockUniforms, blockVarIndices.data(), GL_UNIFORM_OFFSET, offsets.data());
+
+	for (GLint i = 0; i < numBlockUniforms; ++i)
+	{
+    char uniformName[128] = { 0 };
+		glGetActiveUniformName(program, blockVarIndices[i], sizeof(uniformName)-1, NULL, uniformName);
+		LOG("    %s is at %d\n", uniformName, offsets[i]);
+	}
 }

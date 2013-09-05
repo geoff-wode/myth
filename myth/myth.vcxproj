@@ -21,6 +21,8 @@
     <ClCompile Include="src\shader.cpp" />
     <ClCompile Include="src\texture.cpp" />
     <ClCompile Include="src\scenegraph\assetnode.cpp" />
+    <ClCompile Include="src\world\grid.cpp" />
+    <ClCompile Include="src\world\hellocrates.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="include\asset.h" />
@@ -32,7 +34,6 @@
     <ClInclude Include="include\files.h" />
     <ClInclude Include="include\light.h" />
     <ClInclude Include="include\renderstate.h" />
-    <ClInclude Include="include\sampler.h" />
     <ClInclude Include="include\scenegraph\scene.h" />
     <ClInclude Include="include\scenegraph\scenenode.h" />
     <ClInclude Include="include\scenegraph\transformnode.h" />
@@ -40,8 +41,12 @@
     <ClInclude Include="include\texture.h" />
     <ClInclude Include="include\textureunit.h" />
     <ClInclude Include="include\scenegraph\assetnode.h" />
+    <ClInclude Include="include\world\grid.h" />
+    <ClInclude Include="include\world\hellocrates.h" />
   </ItemGroup>
   <ItemGroup>
+    <None Include="shaders\directionallight\fs.glsl" />
+    <None Include="shaders\directionallight\vs.glsl" />
     <None Include="shaders\phong\fs.glsl" />
     <None Include="shaders\phong\vs.glsl" />
     <None Include="shaders\simplest\fs.glsl" />

@@ -4,6 +4,7 @@
 #include <glm/glm.hpp>
 #include <textureunit.h>
 #include <shader.h>
+#include <asset.h>
 #include <gl_loader/gl_loader.h>
 #include <boost/shared_ptr.hpp>
 

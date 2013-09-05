@@ -14,6 +14,8 @@ struct TransformNode : public SceneNode
 
   virtual bool PreRender(Scene* const scene);
   virtual void PostRender(Scene* const scene);
+
+  virtual const char* TypeName() const { return "TransformNode"; }
 };
 
 #endif // __TRANSFORM_NODE__

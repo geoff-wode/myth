@@ -8,8 +8,6 @@
 
 //--------------------------------------------------------------------
 
-static const size_t MaxLights = 4;
-
 struct GlobalUniforms
 {
   glm::vec4 CameraPos;                  // World coordinate of the "camera".
@@ -18,7 +16,6 @@ struct GlobalUniforms
   glm::mat4 ProjectionMatrix;           // Projection- to screen-space transform.
   glm::mat4 NormalMatrix;               // Surface normal transform.
   glm::mat4 WorldViewProjectionMatrix;  // The full transformative beans.
-  Light lights[MaxLights];
 };
 
 //--------------------------------------------------------------------
@@ -26,6 +23,7 @@ struct GlobalUniforms
 static void OnExit();
 static void ForceClearState(const ClearState& state);
 static void ForceRenderState(const RenderState& state);
+static void ApplyRenderState(const RenderState& renderState, const Device::ShaderVariables& shaderVars);
 static void ApplyShader(boost::shared_ptr<Shader> value);
 static void ApplyTextureUnits(const TextureUnit textureUnits[]);
 static void ApplyVAO(GLuint value);
@@ -143,28 +141,16 @@ void Device::Clear(const ClearState& clearState, GLenum buffers)
 
 void Device::Draw(GLenum primitiveType, GLint startVertex, GLint vertexCount, const RenderState& renderState)
 {
-  if (globalUniformsDirty)
-  {
-    // Create a matrix that rotates normals (no scaling or translation)...
-    globalUniforms.NormalMatrix = glm::mat4(glm::transpose(glm::inverse(glm::mat3(globalUniforms.WorldMatrix))));
-
-    // Create the model-to-screen space matrix...
-    globalUniforms.WorldViewProjectionMatrix = globalUniforms.ProjectionMatrix * globalUniforms.ViewMatrix * globalUniforms.WorldMatrix;
-
-    uniformBuffer->Enable();
-    uniformBuffer->SetData(&globalUniforms, sizeof(globalUniforms), 0);
-
-    globalUniformsDirty = false;
-  }
-
-  ApplyShader(renderState.shader);
-  ApplyVAO(renderState.vao);
-  ApplyTextureUnits(renderState.textureUnits);
-  ApplyColourMask(renderState.colourMask);
-  ApplyDepthMask(renderState.depthMask);
-  ApplyDepthFunc(renderState.enableDepthTest, renderState.depthFunc);
-
+  ApplyRenderState(renderState, shaderVars);
   glDrawArrays(primitiveType, startVertex, vertexCount);
+}
+
+//--------------------------------------------------------------------
+
+void Device::DrawIndexed(GLenum primitiveType, size_t indexCount, GLenum indexType, size_t bufferOffset, const RenderState& renderState)
+{
+  ApplyRenderState(renderState, shaderVars);
+  glDrawElements(primitiveType, indexCount, indexType, (const void*)bufferOffset);
 }
 
 //--------------------------------------------------------------------
@@ -175,83 +161,18 @@ void Device::SwapBuffers()
 }
 
 //--------------------------------------------------------------------
-void Device::EnableLight(size_t index, bool turnOn)
-{
-  if (index < MaxLights)
-  {
-    if (globalUniforms.lights[index].enabled != turnOn)
-    {
-      globalUniforms.lights[index].enabled = turnOn;
-      globalUniformsDirty = true;
-    }
-  }
-}
-
-void Device::SetLight(size_t index, const Light& value)
-{
-  if (index < MaxLights)
-  {
-    globalUniforms.lights[index] = value;
-    globalUniformsDirty = true;
-  }
-}
-
-//--------------------------------------------------------------------
-const ClearState& Device::GetClearState()
+const ClearState& Device::GetClearState() const
 {
   return currentClearState;
 }
 
-const RenderState& Device::GetRenderState()
+const RenderState& Device::GetRenderState() const
 {
   return currentRenderState;
 }
 
 //--------------------------------------------------------------------
 
-void Device::SetCameraPos(const glm::vec3& value)
-{
-  if (globalUniforms.CameraPos != glm::vec4(value,1))
-  {
-    globalUniforms.CameraPos = glm::vec4(value,1);
-    globalUniformsDirty = true;
-  }
-}
-
-//--------------------------------------------------------------------
-
-void Device::SetWorldMatrix(const glm::mat4& value)
-{
-  if (globalUniforms.WorldMatrix != value)
-  {
-    globalUniforms.WorldMatrix = value;
-    globalUniformsDirty = true;
-  }
-}
-
-//--------------------------------------------------------------------
-  
-void Device::SetViewMatrix(const glm::mat4& value)
-{
-  if (globalUniforms.ViewMatrix != value)
-  {
-    globalUniforms.ViewMatrix = value;
-    globalUniformsDirty = true;
-  }
-}
-
-//--------------------------------------------------------------------
- 
-void Device::SetProjectionMatrix(const glm::mat4& value)
-{
-  if (globalUniforms.ProjectionMatrix != value)
-  {
-    globalUniforms.ProjectionMatrix = value;
-    globalUniformsDirty = true;
-  }
-}
-
-//--------------------------------------------------------------------
 static void OnExit()
 {
 	SDL_GL_DeleteContext(glContext);
@@ -289,7 +210,6 @@ static void ForceRenderState(const RenderState& state)
   for (size_t i = 0; i < RenderState::MaxTextureUnits; ++i)
   {
     glActiveTexture(GL_TEXTURE0 + i);
-    Sampler2D::Unbind(i);
   }
 }
 
@@ -328,20 +248,19 @@ static void ApplyTextureUnits(const TextureUnit value[])
   {
     glActiveTexture(GL_TEXTURE0 + i);
 
-    if (currentRenderState.textureUnits[i] != value[i])
+    if (value[i].active)
     {
-      if (value[i].active)
+      if (value[i].texture != currentRenderState.textureUnits[i].texture)
       {
-        if (value[i].texture != currentRenderState.textureUnits[i].texture) { value[i].texture->Activate(); }
-        if (value[i].sampler != currentRenderState.textureUnits[i].sampler) { value[i].sampler->Bind(i); }
+        value[i].texture->Activate();
       }
-      else
-      {
-        Sampler2D::Unbind(i);
-      }
-
-      currentRenderState.textureUnits[i] = value[i];
     }
+    else
+    {
+      Texture2D::Deactivate();
+    }
+
+    currentRenderState.textureUnits[i] = value[i];
   }
 }
 
@@ -423,14 +342,32 @@ static void ApplyDepthFunc(bool enabled, GLenum func)
   }
 }
 
-//-----------------------------------------------------
-static bool operator==(const Light& a, const Light& b)
+//--------------------------------------------------------------------
+
+static void ApplyRenderState(const RenderState& renderState, const Device::ShaderVariables& shaderVars)
 {
-  return  (a.position == b.position) &&
-          (a.colourAttenuation == b.colourAttenuation);
-}
-static bool operator!=(const Light& a, const Light& b)
-{
-  return  (a.position != b.position) &&
-          (a.colourAttenuation != b.colourAttenuation);
+  // Update the shared uniform buffer...
+  {
+    globalUniforms.WorldMatrix = shaderVars.WorldMatrix;
+
+    globalUniforms.CameraPos = glm::vec4(shaderVars.CameraPos, 1);
+    globalUniforms.ViewMatrix = shaderVars.ViewMatrix;
+    globalUniforms.ProjectionMatrix = shaderVars.ProjectionMatrix;
+
+    // Create a matrix that rotates normals (no scaling or translation)...
+    globalUniforms.NormalMatrix = glm::mat4(glm::transpose(glm::inverse(glm::mat3(globalUniforms.WorldMatrix))));
+
+    // Create the model-to-screen space matrix...
+    globalUniforms.WorldViewProjectionMatrix = globalUniforms.ProjectionMatrix * globalUniforms.ViewMatrix * globalUniforms.WorldMatrix;
+
+    uniformBuffer->Enable();
+    uniformBuffer->SetData(&globalUniforms, sizeof(globalUniforms), 0);
+  }
+
+  ApplyShader(renderState.shader);
+  ApplyVAO(renderState.vao);
+  ApplyTextureUnits(renderState.textureUnits);
+  ApplyColourMask(renderState.colourMask);
+  ApplyDepthMask(renderState.depthMask);
+  ApplyDepthFunc(renderState.enableDepthTest, renderState.depthFunc);
 }

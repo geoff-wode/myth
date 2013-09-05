@@ -14,6 +14,8 @@ struct AssetNode : public SceneNode
   const boost::shared_ptr<Asset> asset;
 
   virtual void Render(Scene* const scene);
+
+  virtual const char* TypeName() const { return "AssetNode"; }
 };
 
 #endif // __WOODEN_CRATE__

@@ -16,6 +16,10 @@ struct SceneNode
   virtual bool PreRender(Scene* const scene);
   virtual void Render(Scene* const scene);
   virtual void PostRender(Scene* const scene);
+
+  virtual const char* TypeName() const { return "SceneNode"; }
+
+  void LogChildren(size_t indent);
 };
 
 

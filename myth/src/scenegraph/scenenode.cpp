@@ -1,3 +1,4 @@
+#include <debug.h>
 #include <scenegraph/scene.h>
 #include <scenegraph/scenenode.h>
 #include <boost/foreach.hpp>
@@ -37,4 +38,14 @@ void SceneNode::Render(Scene* const scene)
 
 void SceneNode::PostRender(Scene* const scene)
 {
+}
+
+
+void SceneNode::LogChildren(size_t indent)
+{
+  LOG("%*.c%s\n", indent*2, ' ', TypeName());
+  BOOST_FOREACH(boost::shared_ptr<SceneNode> child, children)
+  {
+    child->LogChildren(indent+1);
+  }
 }

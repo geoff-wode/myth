@@ -2,6 +2,7 @@
 #define __TEXTURE__
 
 #include <string>
+#include <gl_loader/gl_loader.h>
 
 class Texture2D
 {
@@ -15,6 +16,10 @@ public:
   size_t GetWidth() const { return width; }
   size_t GetHeight() const { return height; }
 
+  void SetWrapModes(GLenum s, GLenum t);
+  void SetWrapS(GLenum value);
+  void SetWrapT(GLenum value);
+
   void Activate() const;
   static void Deactivate();
 
@@ -23,6 +28,8 @@ private:
   unsigned int handle;
   size_t width;
   size_t height;
+  GLenum wrapModeS;
+  GLenum wrapModeT;
 };
 
 #endif // __TEXTURE__

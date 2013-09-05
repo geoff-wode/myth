@@ -1,13 +1,20 @@
 #include <scenegraph/scene.h>
 #include <scenegraph/scenenode.h>
+#include <debug.h>
 
 Scene::Scene()
+{
+}
+
+Scene::Scene(boost::shared_ptr<Device> device)
+  : device(device)
 {
 }
 
 void Scene::Load()
 {
   root->Load(this);
+  root->LogChildren(0);
 }
 
 void Scene::Update(float elapsedMilliseconds)
