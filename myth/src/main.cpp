@@ -46,7 +46,7 @@ static float rotationOfLight = 0.0f;
 //-----------------------------------------------------
 
 static void Init(const std::string& title, int width, int height, bool fullScreen);
-static void UpdateCamera(float elapsedSeconds, const Uint8* const keyState);
+static void ControlCamera();
 static boost::shared_ptr<Asset> CreateFloorAsset();
 
 //-----------------------------------------------------
@@ -65,8 +65,8 @@ int main(int argc, char* argv[])
   const float aspectRatio((float)1280/(float)720);
   camera = boost::make_shared<Camera>(45.0f, aspectRatio, 0.1f, 1000.0f);
   camera->Position = glm::vec3(-15,2,15);
-  camera->Yaw = 40.0f;
-  camera->Pitch = 5.0f;
+  camera->Yaw(40.0f);
+  camera->Pitch(-5.0f);
 
   boost::shared_ptr<Scene> scene(new Scene(device));
   scene->root = boost::make_shared<SceneNode>();
@@ -109,12 +109,12 @@ int main(int argc, char* argv[])
     if (prevTime == 0) { prevTime = now; }
 
     const float elapsedMilliseconds = (float)(now - prevTime);
-    const float elapsedSeconds = elapsedMilliseconds / 1000.0f;
     prevTime = now;
 
-    const Uint8* keyState = SDL_GetKeyboardState(NULL);
+    ControlCamera();
+    // update the camera and set the various shader uniforms accordingly...
+    camera->Update(elapsedMilliseconds);
 
-    UpdateCamera(elapsedSeconds, keyState);
     device->shaderVars.CameraPos = camera->Position;
     device->shaderVars.ViewMatrix = camera->ViewMatrix;
     device->shaderVars.ProjectionMatrix = camera->PerspectiveMatrix;
@@ -132,17 +132,18 @@ int main(int argc, char* argv[])
 }
 
 //-----------------------------------------------------
-static void UpdateCamera(float elapsedSeconds, const Uint8* const keyState)
+static void ControlCamera()
 {
   // keyboard input...
   {
+    const Uint8* keyState = SDL_GetKeyboardState(NULL);
     const float unitsPerSecond = 2.0f;
-    if (keyState[SDL_SCANCODE_W]) { camera->Position += (camera->Forward * unitsPerSecond * elapsedSeconds); }
-    if (keyState[SDL_SCANCODE_S]) { camera->Position += (-camera->Forward * unitsPerSecond * elapsedSeconds); }
-    if (keyState[SDL_SCANCODE_A]) { camera->Position += (-camera->Right * unitsPerSecond * elapsedSeconds); }
-    if (keyState[SDL_SCANCODE_D]) { camera->Position += (camera->Right * unitsPerSecond * elapsedSeconds); }
-    if (keyState[SDL_SCANCODE_X]) { camera->Position += (glm::vec3(0,1,0) * unitsPerSecond * elapsedSeconds); }
-    if (keyState[SDL_SCANCODE_Z]) { camera->Position += (glm::vec3(0,-1,0) * unitsPerSecond * elapsedSeconds); }
+    if (keyState[SDL_SCANCODE_W]) { camera->MoveForward(); }
+    if (keyState[SDL_SCANCODE_S]) { camera->MoveBackward(); }
+    if (keyState[SDL_SCANCODE_A]) { camera->MoveLeft(); }
+    if (keyState[SDL_SCANCODE_D]) { camera->MoveRight(); }
+    if (keyState[SDL_SCANCODE_X]) { camera->MoveUp(); }
+    if (keyState[SDL_SCANCODE_Z]) { camera->MoveDown(); }
   }
 
   // mouse input...
@@ -150,12 +151,11 @@ static void UpdateCamera(float elapsedSeconds, const Uint8* const keyState)
     const float sensitivity = 0.1f;
     glm::ivec2 position;
     const Uint32 buttons = SDL_GetRelativeMouseState(&position.x, &position.y);
-    camera->Yaw += (sensitivity * (float)position.x);
-    camera->Pitch += (sensitivity * (float)position.y);
+
+    camera->Yaw(sensitivity * (float)position.x);
+    camera->Pitch(sensitivity * (float)position.y);
   }
 
-  // update the camera and set the various shader uniforms accordingly...
-  camera->Update();
 }
 
 //-----------------------------------------------------
