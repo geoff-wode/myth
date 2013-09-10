@@ -11,48 +11,48 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="src\camera.cpp" />
+    <ClCompile Include="src\buffers\uniformbuffer.cpp" />
     <ClCompile Include="src\device.cpp" />
-    <ClCompile Include="src\files.cpp" />
+    <ClCompile Include="src\dirio.cpp" />
+    <ClCompile Include="src\effect.cpp" />
+    <ClCompile Include="src\effectparameter.cpp" />
+    <ClCompile Include="src\buffers\indexbuffer.cpp" />
+    <ClCompile Include="src\fullscreenquad.cpp" />
     <ClCompile Include="src\main.cpp" />
-    <ClCompile Include="src\scenegraph\scene.cpp" />
-    <ClCompile Include="src\scenegraph\scenenode.cpp" />
-    <ClCompile Include="src\scenegraph\transformnode.cpp" />
-    <ClCompile Include="src\shader.cpp" />
-    <ClCompile Include="src\texture.cpp" />
-    <ClCompile Include="src\scenegraph\assetnode.cpp" />
-    <ClCompile Include="src\world\grid.cpp" />
-    <ClCompile Include="src\world\hellocrates.cpp" />
+    <ClCompile Include="src\myth.cpp" />
+    <ClCompile Include="src\program.cpp" />
+    <ClCompile Include="src\buffers\vertexbuffer.cpp" />
+    <ClCompile Include="src\vertexarray.cpp" />
+    <ClCompile Include="src\window.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="include\asset.h" />
-    <ClInclude Include="include\buffers.h" />
-    <ClInclude Include="include\camera.h" />
+    <ClInclude Include="include\buffers\uniformbuffer.h" />
     <ClInclude Include="include\clearstate.h" />
     <ClInclude Include="include\debug.h" />
     <ClInclude Include="include\device.h" />
-    <ClInclude Include="include\files.h" />
-    <ClInclude Include="include\light.h" />
+    <ClInclude Include="include\effect.h" />
+    <ClInclude Include="include\effectparameter.h" />
+    <ClInclude Include="include\dirio.h" />
+    <ClInclude Include="include\buffers\indexbuffer.h" />
+    <ClInclude Include="include\fullscreenquad.h" />
+    <ClInclude Include="include\myth.h" />
+    <ClInclude Include="include\program.h" />
+    <ClInclude Include="include\buffers\vertexbuffer.h" />
     <ClInclude Include="include\renderstate.h" />
-    <ClInclude Include="include\scenegraph\scene.h" />
-    <ClInclude Include="include\scenegraph\scenenode.h" />
-    <ClInclude Include="include\scenegraph\transformnode.h" />
-    <ClInclude Include="include\shader.h" />
-    <ClInclude Include="include\texture.h" />
-    <ClInclude Include="include\textureunit.h" />
-    <ClInclude Include="include\scenegraph\assetnode.h" />
-    <ClInclude Include="include\world\grid.h" />
-    <ClInclude Include="include\world\hellocrates.h" />
+    <ClInclude Include="include\vertexarray.h" />
+    <ClInclude Include="include\vertexdeclaration.h" />
+    <ClInclude Include="include\window.h" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="shaders\directionallight\fs.glsl" />
-    <None Include="shaders\directionallight\vs.glsl" />
-    <None Include="shaders\phong\fs.glsl" />
-    <None Include="shaders\phong\vs.glsl" />
-    <None Include="shaders\simplest\fs.glsl" />
-    <None Include="shaders\simplest\vs.glsl" />
-    <None Include="shaders\textured\fs.glsl" />
-    <None Include="shaders\textured\vs.glsl" />
+    <None Include="..\bin\Debug\stderr.txt" />
+    <None Include="assets\shaders\directionallight\fs.glsl" />
+    <None Include="assets\shaders\directionallight\vs.glsl" />
+    <None Include="assets\shaders\phong\fs.glsl" />
+    <None Include="assets\shaders\phong\vs.glsl" />
+    <None Include="assets\shaders\simplest\fs.glsl" />
+    <None Include="assets\shaders\simplest\vs.glsl" />
+    <None Include="assets\shaders\textured\fs.glsl" />
+    <None Include="assets\shaders\textured\vs.glsl" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <ProjectGuid>{785DD223-1863-46CD-951E-9E687F053A85}</ProjectGuid>
@@ -63,7 +63,7 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
-    <CharacterSet>Unicode</CharacterSet>
+    <CharacterSet>NotSet</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
@@ -124,22 +124,28 @@ if exist $(FREEIMAGE_DIR)lib\$(PlatformShortName)\FreeImage.dll (
   if errorlevel 1 goto OnFault
 )
 
-if exist $(ProjectDir)shaders\ (
-  echo Copying program shader files...
-  xcopy $(ProjectDir)shaders $(OutDir)shaders /s/i/r/y/c
+if exist "$(ASSIMP_DIR)bin\$(PlatformShortName)\" (
+  echo Copying AssImp runtime...
+  xcopy "$(ASSIMP_DIR)bin\$(PlatformShortName)\*.dll" $(OutDir) /r/y
   if errorlevel 1 goto OnFault
 )
 
-if exist $(ProjectDir)models (
-  echo Copying program model files...
-  xcopy $(ProjectDir)models $(OutDir)models /s/i/r/y/c
-  if errorlevel 1 goto OnFault
-)
-
-if exist $(ProjectDir)images (
-  echo Copying program image files...
-  xcopy $(ProjectDir)images $(OutDir)images /s/i/r/y/c
-  if errorlevel 1 goto OnFault
+if exist $(ProjectDir)assets (
+  echo Copying asset files...
+  if exist $(ProjectDir)assets\models (
+    xcopy $(ProjectDir)assets\models $(OutDir)assets\models /s/i/r/y/c
+    if errorlevel 1 goto OnFault
+  )
+  if exist $(ProjectDir)assets\shaders (
+    xcopy $(ProjectDir)assets\shaders $(OutDir)assets\shaders /s/i/r/y/c
+    if errorlevel 1 goto OnFault
+  )
+  if exist $(ProjectDir)assets\images (
+    for  %%f in ("$(ProjectDir)assets\images\*.pcx" "$(ProjectDir)assets\images\*.png") do ( D:\Dev\bin\ImageMagick-6.8.6-9\convert "%%f" "$(OutDir)assets\images\%%~nf.jpg" )
+    xcopy $(ProjectDir)assets\images\*.jpg $(OutDir)assets\images /s/i/r/y/c
+    xcopy $(ProjectDir)assets\images\*.dds $(OutDir)assets\images /s/i/r/y/c
+    if errorlevel 1 goto OnFault
+  )
 )
 
 goto OnOkay

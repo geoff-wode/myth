@@ -1,16 +1,13 @@
-#include <SDL.h>
+#include <cstdlib>
 #include <debug.h>
 #include <device.h>
-#include <buffers.h>
-#include <light.h>
-#include <boost/shared_ptr.hpp>
 #include <boost/make_shared.hpp>
+#include <gl_loader/gl_loader.h>
 
-//--------------------------------------------------------------------
+//-----------------------------------------------------------
 
 struct GlobalUniforms
 {
-  glm::vec4 CameraPos;                  // World coordinate of the "camera".
   glm::mat4 WorldMatrix;                // Model- to view-space transform.
   glm::mat4 ViewMatrix;                 // View- to projection-space transform.
   glm::mat4 ProjectionMatrix;           // Projection- to screen-space transform.
@@ -18,39 +15,133 @@ struct GlobalUniforms
   glm::mat4 WorldViewProjectionMatrix;  // The full transformative beans.
 };
 
-//--------------------------------------------------------------------
+//-----------------------------------------------------------
 
-static void OnExit();
+static void InitialiseSDL();
 static void ForceClearState(const ClearState& state);
+static void ApplyClearColour(const glm::vec4& newValue, glm::vec4& oldValue);
+static void ApplyClearDepth(const float newValue, float& oldValue);
+
 static void ForceRenderState(const RenderState& state);
-static void ApplyRenderState(const RenderState& renderState, const Device::ShaderVariables& shaderVars);
-static void ApplyShader(boost::shared_ptr<Shader> value);
-static void ApplyTextureUnits(const TextureUnit textureUnits[]);
-static void ApplyVAO(GLuint value);
-static void ApplyCulling(bool enabled, GLenum faceToCull, GLenum frontFace);
-static void ApplyColourMask(const glm::bvec4& value);
-static void ApplyDepthMask(bool value);
-static void ApplyDepthFunc(bool enabled, GLenum func);
+static void ApplyRenderState(const RenderState& newValue, RenderState& oldValue);
+static void ApplyGlobalUniforms(Device* const, boost::shared_ptr<UniformBuffer> buffer);
+static void ApplyColourMask(const glm::bvec4& newValue, glm::bvec4& oldValue);
+static void ApplyDepthMask(const bool newValue, bool& oldValue);
+static void ApplyDepthTest(const DepthTest& newValue, DepthTest& oldValue);
+static void ApplyCullTest(const CullTest& newValue, CullTest& oldValue);
+static void ApplyVAO(const boost::shared_ptr<VertexArray> newValue, boost::shared_ptr<VertexArray>& oldValue);
 
-//--------------------------------------------------------------------
+//-----------------------------------------------------------
 
-static SDL_Window* mainWindow = NULL;
-static SDL_GLContext glContext = NULL;
-static ClearState currentClearState;
-static RenderState currentRenderState;
-static GlobalUniforms globalUniforms;
-static boost::shared_ptr<UniformBuffer> uniformBuffer;
-static bool globalUniformsDirty = false;
-static bool operator==(const Light& a, const Light& b);
-static bool operator!=(const Light& a, const Light& b);
-
-//--------------------------------------------------------------------
-
-bool Device::Initialise(const std::string& title, int width, int height, bool fullScreen)
+Device::Device()
 {
-	SDL_Init(SDL_INIT_EVERYTHING);
-	atexit(OnExit);
+}
 
+Device::~Device()
+{
+  SDL_Quit();
+}
+
+//-----------------------------------------------------------
+
+void Device::Initialise(bool fullScreen, int backbufferWidth, int backbufferHeight)
+{
+  SDL_Init(SDL_INIT_EVERYTHING);
+
+  InitialiseSDL();
+  mainWindow = boost::make_shared<Window>(backbufferWidth, backbufferHeight, fullScreen);
+
+	ogl_LoadFunctions();
+  LOG("GL version: %d.%d\n", ogl_GetMajorVersion(), ogl_GetMinorVersion());
+  LOG("GLSL version: %s\n", glGetString(GL_SHADING_LANGUAGE_VERSION));
+  LOG("Vendor: %s\n", glGetString(GL_VENDOR));
+  LOG("Renderer: %s\n", glGetString(GL_RENDERER));
+
+  ForceClearState(clearState);
+
+  globalUniforms = boost::make_shared<UniformBuffer>(0, sizeof(GlobalUniforms), GL_DYNAMIC_DRAW);
+}
+
+//-----------------------------------------------------------
+void Device::Clear(GLenum buffers, const ClearState& clearState)
+{
+  ApplyClearColour(clearState.colour, this->clearState.colour);
+  ApplyClearDepth(clearState.depth, this->clearState.depth);
+  ApplyColourMask(clearState.colourMask, this->clearState.colourMask);
+  ApplyDepthMask(clearState.depthMask, this->clearState.depthMask);
+
+  glClear(buffers);
+}
+
+//-----------------------------------------------------------
+void Device::DrawArray(GLenum primitiveType, size_t primitiveCount, size_t startVertex, boost::shared_ptr<VertexArray> vertexArray)
+{
+  ApplyGlobalUniforms(this, globalUniforms);
+  ApplyVAO(vertexArray, this->renderState.vertexArray);
+
+  size_t vertexCount = 0;
+  switch (primitiveType)
+  {
+  case GL_TRIANGLES: vertexCount = primitiveCount * 3; break;
+  case GL_TRIANGLE_STRIP: vertexCount = primitiveCount + 2; break;
+  default: break;
+  }
+
+  glDrawArrays(primitiveType, startVertex, vertexCount);
+}
+
+void Device::Draw(GLenum primitiveType, size_t primitiveCount, size_t startVertex, const RenderState& renderState)
+{
+  ApplyGlobalUniforms(this, globalUniforms);
+  ApplyRenderState(renderState, this->renderState);
+
+  size_t vertexCount = 0;
+  switch (primitiveType)
+  {
+  case GL_TRIANGLES: vertexCount = primitiveCount * 3; break;
+  case GL_TRIANGLE_STRIP: vertexCount = primitiveCount + 2; break;
+  default: break;
+  }
+
+  glDrawArrays(primitiveType, startVertex, vertexCount);
+}
+
+//-----------------------------------------------------------
+void Device::DrawIndexedArray(GLenum primitiveType, size_t primitiveCount, size_t startIndex, boost::shared_ptr<VertexArray> vertexArray, GLenum indexType)
+{
+  ApplyGlobalUniforms(this, globalUniforms);
+  ApplyVAO(vertexArray, this->renderState.vertexArray);
+
+  size_t indexCount = 0;
+  switch (primitiveType)
+  {
+  case GL_TRIANGLES: indexCount = primitiveCount * 3; break;
+  case GL_TRIANGLE_STRIP: indexCount = primitiveCount + 2; break;
+  default: break;
+  }
+
+  glDrawElements(primitiveType, indexCount, indexType, (const void*)startIndex);
+}
+
+void Device::DrawIndexed(GLenum primitiveType, size_t primitiveCount, size_t startIndex, const RenderState& renderState)
+{
+  ApplyGlobalUniforms(this, globalUniforms);
+  ApplyRenderState(renderState, this->renderState);
+
+  size_t indexCount = 0;
+  switch (primitiveType)
+  {
+  case GL_TRIANGLES: indexCount = primitiveCount * 3; break;
+  case GL_TRIANGLE_STRIP: indexCount = primitiveCount + 2; break;
+  default: break;
+  }
+
+  glDrawElements(primitiveType, indexCount, renderState.indexType, (const void*)startIndex);
+}
+
+//-----------------------------------------------------------
+static void InitialiseSDL()
+{
   static const struct SDLAttribute
   {
     SDL_GLattr  attr;
@@ -71,303 +162,174 @@ bool Device::Initialise(const std::string& title, int width, int height, bool fu
   {
     SDL_GL_SetAttribute(sdlAttributes[i].attr, sdlAttributes[i].value);
   }
-
-  if (fullScreen)
-  {
-    mainWindow = SDL_CreateWindow(
-      title.c_str(),
-      SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
-      0, 0, // width & height are ignored in full screen mode
-      SDL_WINDOW_OPENGL | SDL_WINDOW_FULLSCREEN_DESKTOP);
-  }
-  else
-  {
-    mainWindow = SDL_CreateWindow(
-      title.c_str(),
-      SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
-      width, height,
-      SDL_WINDOW_OPENGL);
-  }
-
-  if (mainWindow)
-  {
-    glContext = SDL_GL_CreateContext(mainWindow);
-    LOG("failed to create OpenGL context: %s\n", SDL_GetError());
-  }
-  else
-  {
-    LOG("failed to create main window: %s\n", SDL_GetError());
-  }
-
-	ogl_LoadFunctions();
-  LOG("GL v%d.%d\n", ogl_GetMajorVersion(), ogl_GetMinorVersion());
-  LOG("GLSL version: %s\n", glGetString(GL_SHADING_LANGUAGE_VERSION));
-  LOG("Vendor: %s\n", glGetString(GL_VENDOR));
-  LOG("Renderer: %s\n", glGetString(GL_RENDERER));
-
-  ForceClearState(currentClearState);
-  ForceRenderState(currentRenderState);
-
-  uniformBuffer = boost::make_shared<UniformBuffer>(sizeof(GlobalUniforms), 0);
-
-  SDL_SetRelativeMouseMode(SDL_TRUE);
-
-  return (NULL != mainWindow) && (NULL != glContext);
 }
 
-//--------------------------------------------------------------------
-
-void Device::Clear(const ClearState& clearState, GLenum buffers)
-{
-  ApplyColourMask(clearState.colourMask);
-  ApplyDepthMask(clearState.depthMask);
-
-  if (currentClearState.colour != clearState.colour)
-  {
-    glClearColor(clearState.colour.r, clearState.colour.g, clearState.colour.b, clearState.colour.a);
-    currentClearState.colour = clearState.colour;
-  }
-
-  if (currentClearState.depth != clearState.depth)
-  {
-    glClearDepth(clearState.depth);
-    currentClearState.depth = clearState.depth;
-  }
-
-  glClear(buffers);
-}
-
-//--------------------------------------------------------------------
-
-void Device::Draw(GLenum primitiveType, GLint startVertex, GLint vertexCount, const RenderState& renderState)
-{
-  ApplyRenderState(renderState, shaderVars);
-  glDrawArrays(primitiveType, startVertex, vertexCount);
-}
-
-//--------------------------------------------------------------------
-
-void Device::DrawIndexed(GLenum primitiveType, size_t indexCount, GLenum indexType, size_t bufferOffset, const RenderState& renderState)
-{
-  ApplyRenderState(renderState, shaderVars);
-  glDrawElements(primitiveType, indexCount, indexType, (const void*)bufferOffset);
-}
-
-//--------------------------------------------------------------------
-
-void Device::SwapBuffers()
-{
-  SDL_GL_SwapWindow(mainWindow);
-}
-
-//--------------------------------------------------------------------
-const ClearState& Device::GetClearState() const
-{
-  return currentClearState;
-}
-
-const RenderState& Device::GetRenderState() const
-{
-  return currentRenderState;
-}
-
-//--------------------------------------------------------------------
-
-static void OnExit()
-{
-	SDL_GL_DeleteContext(glContext);
-	SDL_DestroyWindow(mainWindow);
-  SDL_Quit();
-}
-
-//--------------------------------------------------------------------
-static void ForceRenderState(const RenderState& state)
-{
-  glColorMask(state.colourMask.r, state.colourMask.g, state.colourMask.b, state.colourMask.a);
-  glDepthMask(state.depthMask);
-  
-  if (state.enableDepthTest)
-  {
-    glEnable(GL_DEPTH_TEST);
-    glDepthFunc(state.depthFunc);
-  }
-  else
-  {
-    glDisable(GL_DEPTH_TEST);
-  }
-
-  if (state.enableCulling)
-  {
-    glEnable(GL_CULL_FACE);
-    glCullFace(state.cullFace);
-    glFrontFace(state.frontFace);
-  }
-  else
-  {
-    glDisable(GL_CULL_FACE);
-  }
-
-  for (size_t i = 0; i < RenderState::MaxTextureUnits; ++i)
-  {
-    glActiveTexture(GL_TEXTURE0 + i);
-  }
-}
-
-//-----------------------------------------------------
+//-----------------------------------------------------------
 static void ForceClearState(const ClearState& state)
 {
   glClearColor(state.colour.r, state.colour.g, state.colour.b, state.colour.a);
   glClearDepth(state.depth);
 }
 
-//-----------------------------------------------------
-static void ApplyVAO(GLuint value)
+//-----------------------------------------------------------
+static void ApplyRenderState(const RenderState& newValue, RenderState& oldValue)
 {
-  if (currentRenderState.vao != value)
+  ApplyColourMask(newValue.colourMask, oldValue.colourMask);
+  ApplyDepthMask(newValue.depthMask, oldValue.depthMask);
+  ApplyDepthTest(newValue.depthTest, oldValue.depthTest);
+  ApplyCullTest(newValue.cullTest, oldValue.cullTest);
+  ApplyVAO(newValue.vertexArray, oldValue.vertexArray);
+}
+
+//-----------------------------------------------------------
+static void ApplyGlobalUniforms(Device* const device, boost::shared_ptr<UniformBuffer> buffer)
+{
+  GlobalUniforms values;
+  values.WorldMatrix = device->WorldMatrix;
+  values.ViewMatrix = device->ViewMatrix;
+  values.ProjectionMatrix = device->ProjectionMatrix;
+  values.WorldViewProjectionMatrix = values.ProjectionMatrix * values.ViewMatrix * values.WorldMatrix;
+  values.NormalMatrix = glm::mat4(glm::transpose(glm::inverse(glm::mat3(values.WorldMatrix))));
+  buffer->Bind();
+  buffer->SetData(&values, sizeof(values), 0);
+  buffer->Unbind();
+}
+
+//-----------------------------------------------------------
+static void ForceRenderState(const RenderState& state)
+{
+  glColorMask(state.colourMask.r, state.colourMask.g, state.colourMask.b, state.colourMask.a);
+  glDepthMask(state.depthMask);
+
+  state.cullTest.enabled ? glEnable(GL_CULL_FACE) : glDisable(GL_CULL_FACE);
+  glCullFace(state.cullTest.cullFace);
+  glFrontFace(state.cullTest.frontFace);
+
+  state.depthTest.enabled ? glEnable(GL_DEPTH_TEST) : glDisable(GL_DEPTH_TEST);
+  glDepthFunc(state.depthTest.function);
+}
+
+//-----------------------------------------------------------
+static void ApplyColourMask(const glm::bvec4& newValue, glm::bvec4& oldValue)
+{
+  if (oldValue != newValue)
   {
-    currentRenderState.vao = value;
-    glBindVertexArray(currentRenderState.vao);
+    glColorMask(newValue.r, newValue.g, newValue.b, newValue.a);
+    oldValue = newValue;
   }
 }
 
-//-----------------------------------------------------
-static void ApplyShader(boost::shared_ptr<Shader> value)
+//-----------------------------------------------------------
+static void ApplyDepthMask(const bool newValue, bool& oldValue)
 {
-  if (currentRenderState.shader != value)
+  if (oldValue != newValue)
   {
-    currentRenderState.shader = value;
-    currentRenderState.shader->Use();
-  }
-  currentRenderState.shader->ApplyUniforms();
-}
-
-//-----------------------------------------------------
-static void ApplyTextureUnits(const TextureUnit value[])
-{
-  for (size_t i = 0; i < RenderState::MaxTextureUnits; ++i)
-  {
-    glActiveTexture(GL_TEXTURE0 + i);
-
-    if (value[i].active)
-    {
-      if (value[i].texture != currentRenderState.textureUnits[i].texture)
-      {
-        value[i].texture->Activate();
-      }
-    }
-    else
-    {
-      Texture2D::Deactivate();
-    }
-
-    currentRenderState.textureUnits[i] = value[i];
+    glDepthMask(newValue);
+    oldValue = newValue;
   }
 }
 
-//-----------------------------------------------------
-static void ApplyCulling(bool enabled, GLenum faceToCull, GLenum frontFace)
+//-----------------------------------------------------------
+static void ApplyClearColour(const glm::vec4& newValue, glm::vec4& oldValue)
 {
-  if (currentRenderState.enableCulling != enabled)
+  if (oldValue != newValue)
   {
-    if (currentRenderState.enableCulling && !enabled)
-    {
-      glDisable(GL_CULL_FACE);
-    }
-    else
-    {
-      glEnable(GL_CULL_FACE);
-    }
-    currentRenderState.enableCulling = enabled;
-  }
-
-  if (currentRenderState.enableCulling)
-  {
-    if (currentRenderState.cullFace != faceToCull)
-    {
-      glCullFace(faceToCull);
-      currentRenderState.cullFace = faceToCull;
-    }
-
-    if (currentRenderState.frontFace != frontFace)
-    {
-      glFrontFace(frontFace);
-      currentRenderState.frontFace = frontFace;
-    }
+    glClearColor(newValue.r, newValue.g, newValue.b, newValue.a);
+    oldValue = newValue;
   }
 }
 
-//-----------------------------------------------------
-static void ApplyColourMask(const glm::bvec4& value)
+//-----------------------------------------------------------
+static void ApplyClearDepth(const float newValue, float& oldValue)
 {
-  if (currentRenderState.colourMask != value)
+  if (oldValue != newValue)
   {
-    glColorMask(value.r, value.g, value.b, value.a);
-    currentRenderState.colourMask = value;
+    glClearDepth(newValue);
+    oldValue = newValue;
   }
 }
 
-//-----------------------------------------------------
-static void ApplyDepthMask(bool value)
+//-----------------------------------------------------------
+static void ApplyDepthTest(const DepthTest& newValue, DepthTest& oldValue)
 {
-  if (currentRenderState.depthMask != value)
+  if (newValue.enabled)
   {
-    glDepthMask(value);
-    currentRenderState.depthMask = value;
-  }
-}
-
-//-----------------------------------------------------
-static void ApplyDepthFunc(bool enabled, GLenum func)
-{
-  if (currentRenderState.enableDepthTest != enabled)
-  {
-    if (currentRenderState.enableDepthTest && !enabled)
-    {
-      glDisable(GL_DEPTH_TEST);
-    }
-    else
+    if (!oldValue.enabled)
     {
       glEnable(GL_DEPTH_TEST);
+      oldValue.enabled = true;
     }
-    currentRenderState.enableDepthTest = enabled;
+  }
+  else
+  {
+    if (oldValue.enabled)
+    {
+      glDisable(GL_DEPTH_TEST);
+      oldValue.enabled = false;
+    }
   }
 
-  if (currentRenderState.enableDepthTest)
+  if (oldValue.enabled)
   {
-    if (currentRenderState.depthFunc != func)
+    if (newValue.function != oldValue.function)
     {
-      glDepthFunc(func);
-      currentRenderState.depthFunc = func;
+      glDepthFunc(newValue.function);
+      oldValue.function = newValue.function;
     }
   }
 }
 
-//--------------------------------------------------------------------
-
-static void ApplyRenderState(const RenderState& renderState, const Device::ShaderVariables& shaderVars)
+//-----------------------------------------------------------
+static void ApplyCullTest(const CullTest& newValue, CullTest& oldValue)
 {
-  // Update the shared uniform buffer...
+  if (newValue.enabled)
   {
-    globalUniforms.WorldMatrix = shaderVars.WorldMatrix;
-
-    globalUniforms.CameraPos = glm::vec4(shaderVars.CameraPos, 1);
-    globalUniforms.ViewMatrix = shaderVars.ViewMatrix;
-    globalUniforms.ProjectionMatrix = shaderVars.ProjectionMatrix;
-
-    // Create a matrix that rotates normals (no scaling or translation)...
-    globalUniforms.NormalMatrix = glm::mat4(glm::transpose(glm::inverse(glm::mat3(globalUniforms.WorldMatrix))));
-
-    // Create the model-to-screen space matrix...
-    globalUniforms.WorldViewProjectionMatrix = globalUniforms.ProjectionMatrix * globalUniforms.ViewMatrix * globalUniforms.WorldMatrix;
-
-    uniformBuffer->Enable();
-    uniformBuffer->SetData(&globalUniforms, sizeof(globalUniforms), 0);
+    if (!oldValue.enabled)
+    {
+      glEnable(GL_CULL_FACE);
+      oldValue.enabled = true;
+    }
+  }
+  else
+  {
+    if (oldValue.enabled)
+    {
+      glDisable(GL_CULL_FACE);
+      oldValue.enabled = false;
+    }
   }
 
-  ApplyShader(renderState.shader);
-  ApplyVAO(renderState.vao);
-  ApplyTextureUnits(renderState.textureUnits);
-  ApplyColourMask(renderState.colourMask);
-  ApplyDepthMask(renderState.depthMask);
-  ApplyDepthFunc(renderState.enableDepthTest, renderState.depthFunc);
+  if (oldValue.enabled)
+  {
+    if (newValue.cullFace != oldValue.cullFace)
+    {
+      glCullFace(newValue.cullFace);
+      oldValue.cullFace = newValue.cullFace;
+    }
+    if (newValue.frontFace != oldValue.frontFace)
+    {
+      glFrontFace(newValue.frontFace);
+      oldValue.frontFace = newValue.frontFace;
+    }
+  }
+}
+
+//-----------------------------------------------------------
+static void ApplyVAO(const boost::shared_ptr<VertexArray> newValue, boost::shared_ptr<VertexArray>& oldValue)
+{
+  if (newValue != oldValue)
+  {
+    if (newValue)
+    {
+      newValue->Bind();
+    }
+    else
+    {
+      if (oldValue)
+      {
+        oldValue->Unbind();
+      }
+    }
+    oldValue = newValue;
+  }
 }
