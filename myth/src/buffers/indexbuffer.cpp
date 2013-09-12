@@ -13,7 +13,7 @@ static size_t SizeOfElement(GLenum type)
 }
 
 IndexBuffer::IndexBuffer(GLenum indexType, size_t indexCount, GLenum usage)
-  : IndexType(indexType), elementSize(SizeOfElement(indexType))
+  : IndexType(indexType), IndexCount(indexCount), elementSize(SizeOfElement(indexType))
 {
   glGenBuffers(1, &handle);
   Bind();

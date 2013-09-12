@@ -1,3 +1,4 @@
+#include <memory>
 #include <vertexarray.h>
 #include <effect.h>
 
@@ -18,7 +19,7 @@ void VertexArray::Bind()
 
 void VertexArray::Configure(const VertexDeclaration* const vertexDecl)
 {
-  for (size_t i = 0; i < vertexDecl->attributeCount; ++i)
+  for (size_t i = 0; (i < VertexDeclaration::MaxAttributes) && (vertexDecl->attributes[i].name); ++i)
   {
     glEnableVertexAttribArray(Effect::GetAttributeIndex(vertexDecl->attributes[i].name));
     glVertexAttribPointer(

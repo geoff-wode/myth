@@ -1,12 +1,12 @@
 #include <buffers/uniformbuffer.h>
 
-UniformBuffer::UniformBuffer(unsigned int binding, size_t sizeInBytes, GLenum usage)
+UniformBuffer::UniformBuffer(size_t sizeInBytes, unsigned int binding)
   : SizeInBytes(sizeInBytes)
 {
   glGenBuffers(1, &handle);
   Bind();
   glBindBufferBase(GL_UNIFORM_BUFFER, binding, handle);
-  glBufferData(GL_UNIFORM_BUFFER, SizeInBytes, NULL, usage);
+  glBufferData(GL_UNIFORM_BUFFER, SizeInBytes, NULL, GL_DYNAMIC_DRAW);
   Unbind();
 }
 

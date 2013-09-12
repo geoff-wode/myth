@@ -14,17 +14,18 @@ static struct Vertex
   { glm::vec3(-1.0f, -1.0f, 0.0f), glm::vec2(0,0) },
   { glm::vec3( 1.0f, -1.0f, 0.0f), glm::vec2(1,0) },
   { glm::vec3( 1.0f,  1.0f, 0.0f), glm::vec2(1,1) },
-
-  { glm::vec3( 1.0f,  1.0f, 0.0f), glm::vec2(1,1) },
-  { glm::vec3(-1.0f,  1.0f, 0.0f), glm::vec2(1,0) },
-  { glm::vec3(-1.0f, -1.0f, 0.0f), glm::vec2(0,0) }
+  { glm::vec3(-1.0f,  1.0f, 0.0f), glm::vec2(1,0) }
 };
 static const size_t VertexCount = sizeof(vertices) / sizeof(vertices[0]);
 
-static VertexDeclaration vDecl =
+static const unsigned char indices[] =
+{
+  0, 1, 2,  2, 3, 0
+};
+
+static const VertexDeclaration vDecl =
 {
   sizeof(Vertex),
-  2,
   {
     VertexAttribute("Position", GL_FLOAT, 3, offsetof(Vertex, position)),
     VertexAttribute("TextureCoord0", GL_FLOAT, 2, offsetof(Vertex, textureCoord))
@@ -41,19 +42,21 @@ FullScreenQuad::~FullScreenQuad()
 
 void FullScreenQuad::Load()
 {
-  vb = boost::make_shared<VertexBuffer>(&vDecl, VertexCount, GL_STATIC_DRAW);
-  vb->SetData(vertices, VertexCount, 0);
+  vertexBuffer = boost::make_shared<VertexBuffer>(&vDecl, VertexCount, GL_STATIC_DRAW);
+  vertexBuffer->SetData(vertices, VertexCount, 0);
+
+  indexBuffer = boost::make_shared<IndexBuffer>(GL_UNSIGNED_BYTE, sizeof(indices), GL_STATIC_DRAW);
+  indexBuffer->SetData(indices, sizeof(indices), 0);
 
   vertexArray = boost::make_shared<VertexArray>();
   vertexArray->Bind();
-  vb->Bind();
+
+  vertexBuffer->Bind();
+  indexBuffer->Bind();
+  
   vertexArray->Configure(&vDecl);
+  
   vertexArray->Unbind();
-
-  vb->Unbind();
-}
-
-void FullScreenQuad::Draw(Device* const device)
-{
-  device->DrawArray(GL_TRIANGLES, 2, 0, vertexArray);
+  vertexBuffer->Unbind();
+  indexBuffer->Unbind();
 }

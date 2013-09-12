@@ -9,13 +9,15 @@ static SDL_Window* CreateWindow(const char* const title, int width, int height, 
 
 Window::Window(int width, int height, bool fullScreen)
   : window(CreateWindow("Program", width, height, fullScreen)),
-    glContext(SDL_GL_CreateContext(window))
+    glContext(SDL_GL_CreateContext(window)),
+    Width(width), Height(height), AspectRatio((float)Width/(float)Height)
 {  
 }
 
 Window::Window(const char* const title, int width, int height, bool fullScreen)
   : window(CreateWindow("Program", width, height, fullScreen)),
-    glContext(SDL_GL_CreateContext(window))
+    glContext(SDL_GL_CreateContext(window)),
+    Width(width), Height(height), AspectRatio((float)Width/(float)Height)
 {
 }
 

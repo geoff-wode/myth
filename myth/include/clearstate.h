@@ -7,7 +7,7 @@
 struct ClearState
 {
   ClearState()
-    : colour(0,0,0,1), colourMask(true),
+    : colour(0,0,0,0), colourMask(true),
       depth(1.0f), depthMask(true)
   {
   }

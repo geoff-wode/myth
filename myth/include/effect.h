@@ -1,12 +1,11 @@
 #if ! defined(__EFFECT__)
 #define __EFFECT__
 
-#include <effectparameter.h>
-#include <string>
 #include <map>
-#include <vector>
+#include <effectparameter.h>
 #include <glm/glm.hpp>
 #include <gl_loader/gl_loader.h>
+#include <boost/shared_ptr.hpp>
 
 class Effect
 {
@@ -14,18 +13,19 @@ public:
   Effect();
   virtual ~Effect();
 
-  bool Load(const char* const name);
+  virtual bool Load(const char* const name);
 
   void Use();
 
   // Return the index for attribute 'name' in the shader.
   static GLint GetAttributeIndex(const char* const name);
 
-  const std::map<std::string, EffectParameter* const>& GetParameters() const;
+  EffectParameter* GetEffectParameter(const char* const name) const;
 
 private:
   GLuint program;
-  std::vector<EffectParameter> params;
+
+  std::map<std::string, boost::shared_ptr<EffectParameter>> params;
 
   void GetParameters();
 };

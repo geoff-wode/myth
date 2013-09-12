@@ -13,7 +13,6 @@ struct VertexAttribute
   {
   }
 
-
   const char* const name;
   const GLenum type;
   const size_t elementCount;
@@ -23,7 +22,6 @@ struct VertexAttribute
 struct VertexDeclaration
 {
   const size_t vertexStride;
-  const size_t attributeCount;
   static const size_t MaxAttributes = 16;
   const VertexAttribute attributes[MaxAttributes];
 };

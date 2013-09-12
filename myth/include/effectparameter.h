@@ -7,26 +7,26 @@
 class EffectParameter
 {
 public:
-  EffectParameter& operator=(int value);
-  EffectParameter& operator=(unsigned int value);
-  EffectParameter& operator=(float value);
-  EffectParameter& operator=(const glm::vec2& value);
-  EffectParameter& operator=(const glm::vec3& value);
-  EffectParameter& operator=(const glm::vec4& value);
-  EffectParameter& operator=(const glm::mat2& value);
-  EffectParameter& operator=(const glm::mat3& value);
-  EffectParameter& operator=(const glm::mat4& value);
+  EffectParameter(GLuint program, GLint location, GLenum type);
+
+  void Set(int value);
+  void Set(unsigned int value);
+  void Set(float value);
+  void Set(const glm::vec2& value);
+  void Set(const glm::vec3& value);
+  void Set(const glm::vec4& value);
+  void Set(const glm::mat2& value);
+  void Set(const glm::mat3& value);
+  void Set(const glm::mat4& value);
 
 private:
-  EffectParameter();
+  void SetValue(const void* const value, size_t size);
 
-  char name[64];
-  GLenum type;
+  GLuint program;
   GLint location;
-  bool tainted;
-  double cache[16];
+  GLenum type;
 
-  friend class Effect;
+  double cache[16];
 };
 
 #endif // __EFFECT_PARAMETER__

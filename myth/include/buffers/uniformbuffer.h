@@ -8,7 +8,7 @@ class UniformBuffer
 public:
   const size_t SizeInBytes;
 
-  UniformBuffer(unsigned int binding, size_t sizeInBytes, GLenum usage);
+  UniformBuffer(size_t sizeInBytes, unsigned int binding);
   ~UniformBuffer();
 
   void SetData(const void* const data, size_t sizeInBytes, size_t offsetInBytes);

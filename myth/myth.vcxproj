@@ -19,9 +19,12 @@
     <ClCompile Include="src\buffers\indexbuffer.cpp" />
     <ClCompile Include="src\fullscreenquad.cpp" />
     <ClCompile Include="src\main.cpp" />
+    <ClCompile Include="src\model.cpp" />
+    <ClCompile Include="src\modelmesh.cpp" />
     <ClCompile Include="src\myth.cpp" />
     <ClCompile Include="src\program.cpp" />
     <ClCompile Include="src\buffers\vertexbuffer.cpp" />
+    <ClCompile Include="src\texture.cpp" />
     <ClCompile Include="src\vertexarray.cpp" />
     <ClCompile Include="src\window.cpp" />
   </ItemGroup>
@@ -35,16 +38,22 @@
     <ClInclude Include="include\dirio.h" />
     <ClInclude Include="include\buffers\indexbuffer.h" />
     <ClInclude Include="include\fullscreenquad.h" />
+    <ClInclude Include="include\model.h" />
+    <ClInclude Include="include\modelmesh.h" />
     <ClInclude Include="include\myth.h" />
     <ClInclude Include="include\program.h" />
     <ClInclude Include="include\buffers\vertexbuffer.h" />
     <ClInclude Include="include\renderstate.h" />
+    <ClInclude Include="include\texture.h" />
+    <ClInclude Include="include\textureunit.h" />
     <ClInclude Include="include\vertexarray.h" />
     <ClInclude Include="include\vertexdeclaration.h" />
     <ClInclude Include="include\window.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="..\bin\Debug\stderr.txt" />
+    <None Include="assets\shaders\passthru\fs.glsl" />
+    <None Include="assets\shaders\passthru\vs.glsl" />
     <None Include="assets\shaders\directionallight\fs.glsl" />
     <None Include="assets\shaders\directionallight\vs.glsl" />
     <None Include="assets\shaders\phong\fs.glsl" />
@@ -158,6 +167,10 @@ exit
 echo Build post-step for $(ProjectName) complete.
 </Command>
     </PostBuildEvent>
+    <CustomBuildStep>
+      <Command>
+      </Command>
+    </CustomBuildStep>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <ClCompile>

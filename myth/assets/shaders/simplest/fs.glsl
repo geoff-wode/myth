@@ -1,7 +1,7 @@
 
-out vec4 outFragmentColour;
+out vec4 outColour;
 
 void main()
 {
-  outFragmentColour = vec4(0, 0, 1, 1);
+  outColour = vec4(0, 0, 1, 1);
 }

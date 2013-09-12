@@ -21,6 +21,8 @@ public:
   Device();
   ~Device();
 
+  ClearState GetClearState() const { return clearState; }
+  RenderState GetRenderState() const { return renderState; }
   boost::shared_ptr<Window> GetWindow() const { return mainWindow; }
 
   void Initialise(bool fullScreen, int backbufferWidth, int backbufferHeight);
@@ -28,16 +30,10 @@ public:
   void Clear(GLenum buffers, const ClearState& clearState);
 
   // Use the given render state to draw primitives.
-  void Draw(GLenum primitiveType, size_t primitiveCount, size_t startVertex, const RenderState& renderState);
-
-  // Use the given vertex array to draw primitives, keeping all other render state unchanged.
-  void DrawArray(GLenum primitiveType, size_t primitiveCount, size_t startVertex, boost::shared_ptr<VertexArray> vertexArray);
+  void Draw(GLenum primitiveType, size_t vertexCount, size_t vertexIndex, const RenderState& renderState);
 
   // Use the given render state to draw indexed primitives.
-  void DrawIndexed(GLenum primitiveType, size_t primitiveCount, size_t startIndex, const RenderState& renderState);
-
-  // Use the given vertex array to draw indexed primitives, keeping all other render state unchanged.
-  void DrawIndexedArray(GLenum primitiveType, size_t primitiveCount, size_t startIndex, boost::shared_ptr<VertexArray> vertexArray, GLenum indexType);
+  void DrawIndexed(GLenum primitiveType, size_t indexCount, size_t startIndex, GLenum indexType, const RenderState& renderState);
 
 private:
   boost::shared_ptr<Window> mainWindow;

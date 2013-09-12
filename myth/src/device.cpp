@@ -30,6 +30,8 @@ static void ApplyDepthMask(const bool newValue, bool& oldValue);
 static void ApplyDepthTest(const DepthTest& newValue, DepthTest& oldValue);
 static void ApplyCullTest(const CullTest& newValue, CullTest& oldValue);
 static void ApplyVAO(const boost::shared_ptr<VertexArray> newValue, boost::shared_ptr<VertexArray>& oldValue);
+static void ApplyTextures(const TextureUnit* const newValue, TextureUnit* const oldValue);
+static void ApplyBlending(const Blending& newValue, Blending& oldValue);
 
 //-----------------------------------------------------------
 
@@ -59,7 +61,7 @@ void Device::Initialise(bool fullScreen, int backbufferWidth, int backbufferHeig
 
   ForceClearState(clearState);
 
-  globalUniforms = boost::make_shared<UniformBuffer>(0, sizeof(GlobalUniforms), GL_DYNAMIC_DRAW);
+  globalUniforms = boost::make_shared<UniformBuffer>(sizeof(GlobalUniforms), 0);
 }
 
 //-----------------------------------------------------------
@@ -74,69 +76,21 @@ void Device::Clear(GLenum buffers, const ClearState& clearState)
 }
 
 //-----------------------------------------------------------
-void Device::DrawArray(GLenum primitiveType, size_t primitiveCount, size_t startVertex, boost::shared_ptr<VertexArray> vertexArray)
-{
-  ApplyGlobalUniforms(this, globalUniforms);
-  ApplyVAO(vertexArray, this->renderState.vertexArray);
-
-  size_t vertexCount = 0;
-  switch (primitiveType)
-  {
-  case GL_TRIANGLES: vertexCount = primitiveCount * 3; break;
-  case GL_TRIANGLE_STRIP: vertexCount = primitiveCount + 2; break;
-  default: break;
-  }
-
-  glDrawArrays(primitiveType, startVertex, vertexCount);
-}
-
-void Device::Draw(GLenum primitiveType, size_t primitiveCount, size_t startVertex, const RenderState& renderState)
+void Device::Draw(GLenum primitiveType, size_t vertexCount, size_t startVertex, const RenderState& renderState)
 {
   ApplyGlobalUniforms(this, globalUniforms);
   ApplyRenderState(renderState, this->renderState);
-
-  size_t vertexCount = 0;
-  switch (primitiveType)
-  {
-  case GL_TRIANGLES: vertexCount = primitiveCount * 3; break;
-  case GL_TRIANGLE_STRIP: vertexCount = primitiveCount + 2; break;
-  default: break;
-  }
 
   glDrawArrays(primitiveType, startVertex, vertexCount);
 }
 
 //-----------------------------------------------------------
-void Device::DrawIndexedArray(GLenum primitiveType, size_t primitiveCount, size_t startIndex, boost::shared_ptr<VertexArray> vertexArray, GLenum indexType)
-{
-  ApplyGlobalUniforms(this, globalUniforms);
-  ApplyVAO(vertexArray, this->renderState.vertexArray);
-
-  size_t indexCount = 0;
-  switch (primitiveType)
-  {
-  case GL_TRIANGLES: indexCount = primitiveCount * 3; break;
-  case GL_TRIANGLE_STRIP: indexCount = primitiveCount + 2; break;
-  default: break;
-  }
-
-  glDrawElements(primitiveType, indexCount, indexType, (const void*)startIndex);
-}
-
-void Device::DrawIndexed(GLenum primitiveType, size_t primitiveCount, size_t startIndex, const RenderState& renderState)
+void Device::DrawIndexed(GLenum primitiveType, size_t indexCount, size_t startIndex, GLenum indexType, const RenderState& renderState)
 {
   ApplyGlobalUniforms(this, globalUniforms);
   ApplyRenderState(renderState, this->renderState);
 
-  size_t indexCount = 0;
-  switch (primitiveType)
-  {
-  case GL_TRIANGLES: indexCount = primitiveCount * 3; break;
-  case GL_TRIANGLE_STRIP: indexCount = primitiveCount + 2; break;
-  default: break;
-  }
-
-  glDrawElements(primitiveType, indexCount, renderState.indexType, (const void*)startIndex);
+  glDrawElements(primitiveType, indexCount, indexType, (const void*)startIndex);
 }
 
 //-----------------------------------------------------------
@@ -179,20 +133,22 @@ static void ApplyRenderState(const RenderState& newValue, RenderState& oldValue)
   ApplyDepthTest(newValue.depthTest, oldValue.depthTest);
   ApplyCullTest(newValue.cullTest, oldValue.cullTest);
   ApplyVAO(newValue.vertexArray, oldValue.vertexArray);
+  ApplyTextures(newValue.textureUnits, oldValue.textureUnits);
+  ApplyBlending(newValue.blending, oldValue.blending);
 }
 
 //-----------------------------------------------------------
 static void ApplyGlobalUniforms(Device* const device, boost::shared_ptr<UniformBuffer> buffer)
 {
-  GlobalUniforms values;
-  values.WorldMatrix = device->WorldMatrix;
-  values.ViewMatrix = device->ViewMatrix;
-  values.ProjectionMatrix = device->ProjectionMatrix;
-  values.WorldViewProjectionMatrix = values.ProjectionMatrix * values.ViewMatrix * values.WorldMatrix;
-  values.NormalMatrix = glm::mat4(glm::transpose(glm::inverse(glm::mat3(values.WorldMatrix))));
-  buffer->Bind();
-  buffer->SetData(&values, sizeof(values), 0);
-  buffer->Unbind();
+  //GlobalUniforms values;
+  //values.WorldMatrix = device->WorldMatrix;
+  //values.ViewMatrix = device->ViewMatrix;
+  //values.ProjectionMatrix = device->ProjectionMatrix;
+  //values.WorldViewProjectionMatrix = values.ProjectionMatrix * values.ViewMatrix * values.WorldMatrix;
+  //values.NormalMatrix = glm::mat4(glm::transpose(glm::inverse(glm::mat3(values.WorldMatrix))));
+  //buffer->Bind();
+  //buffer->SetData(&values, sizeof(values), 0);
+  //buffer->Unbind();
 }
 
 //-----------------------------------------------------------
@@ -207,6 +163,9 @@ static void ForceRenderState(const RenderState& state)
 
   state.depthTest.enabled ? glEnable(GL_DEPTH_TEST) : glDisable(GL_DEPTH_TEST);
   glDepthFunc(state.depthTest.function);
+
+  state.blending.enabled ? glEnable(GL_BLEND) : glDisable(GL_BLEND);
+  glBlendFunc(state.blending.source, state.blending.destination);
 }
 
 //-----------------------------------------------------------
@@ -331,5 +290,67 @@ static void ApplyVAO(const boost::shared_ptr<VertexArray> newValue, boost::share
       }
     }
     oldValue = newValue;
+  }
+}
+
+//-----------------------------------------------------------
+static void ApplyTextures(const TextureUnit* const newValue, TextureUnit* const oldValue)
+{
+  for (size_t i = 0; i < RenderState::MaxTextureUnits; ++i)
+  {
+    glActiveTexture(GL_TEXTURE0 + i);
+
+    if (oldValue[i].active && !newValue[i].active)
+    {
+      // The new state is disabling this texture unit...
+      oldValue[i].active = false;
+      oldValue[i].texture->Unbind();
+    }
+    else
+    {
+      if (newValue[i].active || (oldValue[i].texture != newValue[i].texture))
+      {
+        if (newValue[i].active && newValue[i].texture)
+        {
+          // The new state is either enabling this texture unit OR changing the texture
+          // which is bound to that unit. In either case, the texture needs to be bound...
+          newValue[i].texture->Bind();
+          oldValue[i].active = true;
+          oldValue[i].texture = newValue[i].texture;
+        }
+        else
+        {
+          ASSERTM(false, "texture unit %d activated without associated texture\n", i);
+        }
+      }
+    }
+  }
+
+  // See the comment in Texture.cpp::Load() for why this is done:
+  glActiveTexture(GL_TEXTURE0 + RenderState::MaxTextureUnits);
+}
+
+//-----------------------------------------------------------
+static void ApplyBlending(const Blending& newValue, Blending& oldValue)
+{
+  if (newValue.enabled && !oldValue.enabled)
+  {
+    glEnable(GL_BLEND);
+    oldValue.enabled = true;
+  }
+  else if (oldValue.enabled && !newValue.enabled)
+  {
+    glDisable(GL_BLEND);
+    oldValue.enabled = false;
+  }
+
+  if (oldValue.enabled)
+  {
+    if ((newValue.source != oldValue.source) || (newValue.destination != oldValue.destination))
+    {
+      glBlendFunc(newValue.source, newValue.destination);
+      oldValue.source = newValue.source;
+      oldValue.destination = newValue.destination;
+    }
   }
 }

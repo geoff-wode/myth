@@ -3,7 +3,7 @@
 #include <debug.h>
 #include <vector>
 #include <memory>
-#include <map>
+#include <string.h>
 #include <boost/shared_ptr.hpp>
 #include <boost/make_shared.hpp>
 #include <boost/foreach.hpp>
@@ -17,15 +17,28 @@ static const char CommonShaderCode[] =
 	"#define PI 3.14159\n"
 	"#define TWO_PI (PI * 2)\n"
 	"#define PI_OVER_2 (PI * 0.5f)\n"
-	"\n"
-	"layout (std140) uniform GlobalUniforms\n"
-	"{\n"
-  " mat4 WorldMatrix;                // Model- to view-space transform.\n"
-  " mat4 ViewMatrix;                 // View- to projection-space transform.\n"
-  " mat4 ProjectionMatrix;           // Projection- to screen-space transform.\n"
-  " mat4 NormalMatrix;               // Surface normal transform.\n"
-  " mat4 WorldViewProjectionMatrix;  // The full transformative beans.\n"
-	"};\n"
+	//"\n"
+	//"layout (std140) uniform GlobalUniforms\n"
+	//"{\n"
+ // " mat4 WorldMatrix;                // Model- to view-space transform.\n"
+ // " mat4 ViewMatrix;                 // View- to projection-space transform.\n"
+ // " mat4 ProjectionMatrix;           // Projection- to screen-space transform.\n"
+ // " mat4 NormalMatrix;               // Surface normal transform.\n"
+ // " mat4 WorldViewProjectionMatrix;  // The full transformative beans.\n"
+	//"};\n"
+  "\n"
+  "layout (location = 0) in vec3 Position;\n"
+  "layout (location = 1) in vec3 Normal;\n"
+  "layout (location = 2) in vec4 TextureCoord0;\n"
+  "layout (location = 3) in vec4 TextureCoord1;\n"
+  "layout (location = 4) in vec4 TextureCoord2;\n"
+  "layout (location = 5) in vec4 TextureCoord3;\n"
+  "\n"
+  "uniform mat4 WorldMatrix;                // Model- to view-space transform.\n"
+  "uniform mat4 ViewMatrix;                 // View- to projection-space transform.\n"
+  "uniform mat4 ProjectionMatrix;           // Projection- to screen-space transform.\n"
+  "uniform mat4 NormalMatrix;               // Surface normal transform.\n"
+  "uniform mat4 WorldViewProjectionMatrix;  // The full transformative beans.\n"
 };
 
 static const char* const AttributeNames[] =
@@ -94,26 +107,6 @@ void Effect::Use()
     currentEffect = this;
     glUseProgram(program);
   }
-
-  for (size_t i = 0; i < params.size(); ++i)
-  {
-    if (params[i].tainted)
-    {
-		  switch (params[i].type)
-		  {
-      case GL_INT:         glUniform1i(params[i].location, *(GLint*)params[i].cache); break;
-      case GL_UNSIGNED_INT:glUniform1ui(params[i].location, *(GLuint*)params[i].cache); break;
-		  case GL_FLOAT:		  glUniform1f(params[i].location, *(float*)params[i].cache); break;
-		  case GL_FLOAT_VEC2: glUniform2fv(params[i].location, 1, (float*)params[i].cache); break;
-		  case GL_FLOAT_VEC3: glUniform3fv(params[i].location, 1, (float*)params[i].cache); break;
-		  case GL_FLOAT_VEC4: glUniform4fv(params[i].location, 1, (float*)params[i].cache); break;
-		  case GL_FLOAT_MAT2: glUniformMatrix2fv(params[i].location, 1, GL_FALSE, (float*)params[i].cache); break;
-		  case GL_FLOAT_MAT3: glUniformMatrix3fv(params[i].location, 1, GL_FALSE, (float*)params[i].cache); break;
-		  case GL_FLOAT_MAT4: glUniformMatrix4fv(params[i].location, 1, GL_FALSE, (float*)params[i].cache); break;
-		  }
-      params[i].tainted = false;
-    }
-  }
 }
 
 //--------------------------------------------------
@@ -126,6 +119,19 @@ GLint Effect::GetAttributeIndex(const char* const name)
   }
   LOG("unknown shader attribute requested: %s\n", name);
   return -1;
+}
+
+//--------------------------------------------------
+
+EffectParameter* Effect::GetEffectParameter(const char* const name) const
+{
+  std::map<std::string, boost::shared_ptr<EffectParameter>>::const_iterator i = params.find(name);
+  if (i != params.cend())
+  {
+    return i->second.get();
+  }
+
+  return NULL;
 }
 
 //--------------------------------------------------
@@ -154,29 +160,11 @@ static std::vector<GLuint> Compile(const std::vector<std::string>& shaderNames)
 
 static GLuint CompileShader(const char* const code, int codeLength, GLenum type)
 {
-  static const char AttribLayout[] =
-  {
-	  "\n"
-    "layout (location = 0) in vec3 Position;\n"
-    "layout (location = 1) in vec3 Normal;\n"
-    "layout (location = 2) in vec2 TextureCoord0;\n"
-    "layout (location = 3) in vec2 TextureCoord1;\n"
-    "layout (location = 4) in vec2 TextureCoord2;\n"
-    "layout (location = 5) in vec2 TextureCoord3;\n"
-	  "\n"
-  };
-
   std::vector<const char*> source;
   std::vector<GLint> lengths;
 
   source.push_back(CommonShaderCode);
   lengths.push_back(sizeof(CommonShaderCode));
-
-  if (GL_VERTEX_SHADER == type)
-  {
-    source.push_back(AttribLayout);
-    lengths.push_back(sizeof(AttribLayout));
-  }
 
   source.push_back(code);
   lengths.push_back(codeLength);
@@ -264,19 +252,15 @@ void Effect::GetParameters()
 
 	for (int i = 0; i < numUniforms; ++i)
 	{
-    EffectParameter p;
-
-    glGetActiveUniformName(program, i, sizeof(p.name), NULL, p.name);
+    char name[128];
+    glGetActiveUniformName(program, i, sizeof(name), NULL, name);
 
 		if (-1 == blockIndices[i])
 		{
-  		// parameter is 
-      EffectParameter p;
-      p.type = types[i];
-      p.location = glGetUniformLocation(program, p.name);
-			params.push_back(p);
-
-      LOG("    %s\n", p.name);
+      const GLint location = glGetUniformLocation(program, name);
+      boost::shared_ptr<EffectParameter> p(new EffectParameter(program, location, types[i]));
+      params[name] = p;
+      LOG("    %s\n", name);
 		}
 	}
 

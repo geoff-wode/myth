@@ -1,0 +1,23 @@
+# File produced by Open Asset Import Library (http://www.assimp.sf.net)
+# (assimp v3.0.1262)
+
+newmtl JoinedMaterial_#3
+kd 0.247059 0.227451 0.227451
+ka 0.2 0.2 0.2
+ks 0.00392157 0.00392157 0.00392157
+d 1
+Ns 20
+illum 2
+map_kd bark_loo.jpg
+bump bark_loo.jpg
+map_bump bark_loo.jpg
+
+newmtl Rinde_Leaf
+kd 0.47451 0.466667 0.47451
+ka 0.2 0.2 0.2
+ks 0 0 0
+d 1
+Ns 20
+illum 2
+map_kd blatt1.jpg
+

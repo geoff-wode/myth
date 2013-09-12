@@ -10,6 +10,7 @@ public:
   ~IndexBuffer();
 
   const GLenum IndexType;
+  const size_t IndexCount;
 
   void SetData(const void* const data, size_t indexCount, size_t startIndex);
   void Bind();

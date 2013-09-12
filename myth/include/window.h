@@ -15,6 +15,10 @@ public:
   void SetTitle(const char* const value);
   void SwapBuffers();
 
+  const int Width;
+  const int Height;
+  const float AspectRatio;
+
 private:
   int width;
   int height;

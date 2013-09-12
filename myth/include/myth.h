@@ -6,7 +6,7 @@
 #include <buffers/vertexbuffer.h>
 #include <buffers/indexbuffer.h>
 #include <boost/shared_ptr.hpp>
-#include <fullscreenquad.h>
+#include <model.h>
 
 class Myth : public Program
 {
@@ -21,8 +21,9 @@ protected:
   virtual void Render(float elapsedMS);
 
 private:
-  boost::shared_ptr<Effect> simplestEffect;
-  boost::shared_ptr<FullScreenQuad> fullScreenQuad;
+  boost::shared_ptr<Effect> effect;
+  std::vector<glm::mat4> transforms;
+  std::vector<boost::shared_ptr<Model>> models;
   RenderState renderState;
   ClearState clearState;
 };
